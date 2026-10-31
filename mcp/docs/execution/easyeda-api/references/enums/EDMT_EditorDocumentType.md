@@ -1,0 +1,37 @@
+# EDMT\_EditorDocumentType enum
+
+Editor document type
+
+## Signature
+
+```typescript
+enum EDMT_EditorDocumentType
+```
+
+## Enumeration Members
+
+|Member|Value|Description|
+|---|---|---|
+|BLANK|`0`||
+|FOOTPRINT|`4`||
+|HOME|`-1`||
+|PANEL|`26`||
+|PANEL\_3D\_PREVIEW|`27`||
+|PANEL\_LIBRARY|`29`||
+|PCB|`3`||
+|PCB\_2D\_PREVIEW|`12`||
+|PCB\_3D\_PREVIEW|`15`||
+|PROJECT|`5`||
+|SCHEMATIC\_PAGE|`1`||
+|SIMULATION\_SCHEMATIC\_PAGE\_NGSPICE|`8`||
+|SIMULATION\_SCHEMATIC\_PAGE\_SIMULIDE|`9`||
+|SIMULATION\_SYMBOL\_COMPONENT\_NGSPICE|`7`||
+|SIMULATION\_SYMBOL\_COMPONENT\_SIMULIDE|`32`||
+|SYMBOL\_CBB|`17`||
+|SYMBOL\_COMPONENT|`2`||
+|SYMBOL\_DRAWING|`20`||
+|SYMBOL\_NET\_FLAG|`18`||
+|SYMBOL\_NET\_PORT|`19`||
+|SYMBOL\_NON\_ELECTRICAL|`21`||
+|SYMBOL\_OFF\_PAGE\_CONNECTOR\_FLAG|`25`||
+|SYMBOL\_SHORT\_CIRCUIT\_FLAG|`22`||

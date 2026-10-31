@@ -1,0 +1,771 @@
+<template>
+  <div v-if="!showEditor" class="chat-view">
+    <div class="messages" v-if="chatMessages?.length" ref="messagesContainer" @scroll="onScroll">
+      <ChatMessage v-for="(msg, idx) in chatMessages" :key="msg._id ?? cyrb53(msg.content + msg.thinking)" :msg="msg"
+        :idx="idx" :isFirstInGroup="isFirstInAiGroup(idx)" :isLastInGroup="isLastInAiGroup(idx)"
+        :firstInGroupIdx="getFirstInGroupIdx(idx)" @retry-send="retrySend" @edit-message="onEditMessage"
+        @inline-buttons="onInlineButtons" @delete-message="deleteMessage" />
+
+      <div v-if="isLoading" class="message ai typing-indicator">
+        <!-- <div v-if="!isLastInAiGroup(chatMessages.length - 1)" class="avatar">
+          <Icon name="Cpu" size="20" />
+        </div> -->
+        <TypingDots dots-position="left" :status="progressStatus" :show-dots="false" />
+        <Timer style="margin-left: auto;" />
+      </div>
+
+      <div v-if="errorMessage" class="error-container">
+        <ErrorBanner :message="errorMessage" />
+        <MessageBottomControls @retry="retrySend(-1)" :show="['retry']" />
+      </div>
+
+    </div>
+
+    <!-- Empty placeholder shown when there are no chat messages -->
+    <div class="messages placeholder" v-else>
+      <div v-if="recentChats.length > 0" class="recent-chats">
+        <p class="recent-chats-title">Recent chats:</p>
+        <div class="recent-chats-list">
+          <div v-for="chat in recentChats" :key="chat.id" class="recent-chat-item" @click="switchToChat(chat.id)">
+            <span class="recent-chat-title">{{ chat.title + ': ' + (chat.messages[0]?.content ?? 'Empty') }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="placeholder-content">
+        <p class="empty-title">No messages</p>
+        <p class="empty-sub">Please enter your message in the box below.</p>
+        <p class="empty-hint">Hint: Enable "Upload selected" to attach the selected schema to the request.</p>
+      </div>
+    </div>
+
+    <div class="input">
+      <div class="input-header">
+        <ToDoList :todos="todos" />
+
+        <div v-if="settingsStore.getSetting('showInlineButtons') && inlineButtons.length" class="inline-buttons">
+          <IconButton :size="10" class="inline-button" variant="primary" v-for="btn in inlineButtons" :key="btn.text"
+            :icon="btn.icon" @click="btn.handler()">
+            {{ btn.text }}
+          </IconButton>
+        </div>
+
+        <IconButton class="scroll-to-bottom-btn" v-if="showScrollButton" @click="scrollToBottom" icon="ChevronDown"
+          :size="14" />
+      </div>
+
+      <div class="input-container" :class="{ 'input-container-loading': isLoading }">
+        <div class="input-options">
+          <IconButton class="input-option" v-for="opt in options.filter(o => o.showIfValue ? o.value : true)"
+            :key="opt.label" :icon="opt.icon" :size="10" :class="['option-btn', { active: opt.value }]"
+            @click="opt.value = !opt.value" :disabled="isLoading">
+            <label>{{ opt.label }}</label>
+          </IconButton>
+        </div>
+
+        <div v-if="attachedFiles.length > 0" class="attached-files">
+          <div v-for="file in attachedFiles" :key="file.id" class="attached-file">
+            <Icon :name="file.type === 'image' ? 'Image' : 'FileText'" size="14" />
+            <span class="attached-file-name">{{ file.name }}</span>
+            <span class="attached-file-size">{{ formatFileSize(file.size) }}</span>
+            <IconButton icon="X" variant="ghost" class="attached-file-remove" @click="removeAttachedFile(file.id)"
+              title="Remove file" />
+          </div>
+        </div>
+
+        <div class="input-area">
+          <IconButton :size="16" icon="Paperclip" class="attach-btn" @click="handleAttachClick"></IconButton>
+
+          <input ref="fileInput" type="file" multiple :accept="getAcceptString()" @change="handleFileSelect"
+            style="display: none;" />
+
+          <AdjTextarea v-model="newMessage" placeholder="Ask about components, specifications, or circuits..."
+            @enter="sendMessageAndScroll" />
+
+          <IconButton class="send-btn" @click="isLoading ? cancelRequest() : sendMessageAndScroll()"
+            :disabled="newMessage.trim() === '' && !isLoading" :size="20"
+            :icon="isLoading ? 'Square' : 'SendHorizonal'" />
+        </div>
+
+      </div>
+
+      <ContextMenu ref="attachCtxMenu" :items="attachMenuItems" />
+    </div>
+  </div>
+
+  <div v-else class="editor-overlay">
+    <div class="editor-container">
+      <div class="editor-main">
+        <BlockDiagramEditor ref="blockDiagramEditor">
+          <IconButton class="editor-btn" @click="toggleHistoryPanel" icon="History" :size="18" />
+          <IconButton class="editor-btn" @click="attachBlockDiagram" icon="Check" :size="18" />
+          <IconButton class="editor-btn" @click="showEditor = false" icon="X" :size="18" />
+          <div v-if="showHistoryPanel" class="editor-history-panel">
+            <BlockDiagramHistory ref="historyPanel" @load="loadDiagramFromHistory" @close="showHistoryPanel = false" />
+          </div>
+        </BlockDiagramEditor>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, nextTick, watch, onActivated, onUnmounted, computed } from 'vue';
+import useChat from '../../composables/useChat';
+import Icon from '../shared/Icon.vue';
+import IconButton from '../shared/IconButton.vue';
+import ChatMessageContent from './ChatMessageContent.vue';
+import MessageBottomControls from './MessageBottomControls.vue';
+import TypingDots from '../shared/TypingDots.vue';
+import AdjTextarea from '../shared/AdjTextarea.vue';
+import { useSettingsStore } from '../../stores/settings-store';
+import ErrorBanner from '../shared/ErrorBanner.vue';
+import Timer from '../shared/Timer.vue';
+import ChatMessage from './ChatMessage.vue';
+import { cyrb53 } from '../../utils/hash';
+import { useChatHistoryStore } from '../../stores/chat-history-store';
+import BlockDiagramEditor from '../block-diagram/BlockDiagramEditor.vue';
+import BlockDiagramHistory from '../block-diagram/BlockDiagramHistory.vue';
+import ContextMenu from '../shared/ContextMenu.vue';
+import { showToastMessage } from '../../eda/utils';
+import { useBlockDiagramHistoryStore } from '../../stores/block-diagram-history-store';
+import ToDoList from '../shared/ToDoList.vue';
+import { formatFileSize } from '../../utils/file-size';
+import CustomSelect from '../shared/CustomSelect.vue';
+
+const settingsStore = useSettingsStore();
+const blockDiagramHistoryStore = useBlockDiagramHistoryStore();
+const chatHistoryStore = useChatHistoryStore();
+
+const recentChats = computed(() => {
+  const allChats = chatHistoryStore.getAllChats();
+  return allChats.slice(1, 4);
+});
+
+const {
+  chatMessages,
+  newMessage,
+  isLoading,
+  progressStatus,
+  errorMessage,
+  inlineButtons,
+  options,
+  lastInlineBtnIdx,
+  todos,
+  attachedFiles,
+  onInlineButtons,
+  sendMessage,
+  cancelRequest,
+  retrySend,
+  deleteMessage,
+  onEditMessage,
+  handleFileSelect,
+  handleClipboardPaste,
+  removeAttachedFile,
+  getAcceptString
+} = useChat();
+
+const messagesContainer = ref<HTMLElement | null>(null);
+const showScrollButton = ref(false);
+const isScrollAnchored = ref(true);
+const SCROLL_ANCHOR_THRESHOLD = 100;
+const showEditor = ref(false);
+const showHistoryPanel = ref(false);
+const blockDiagramEditor = ref<InstanceType<typeof BlockDiagramEditor> | null>(null);
+const attachCtxMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+
+onActivated(() => {
+  nextTick(() => {
+    if (chatMessages.value.length > 0) {
+      scrollToBottom();
+    }
+  });
+})
+
+watch(chatMessages, () => {
+  errorMessage.value = '';
+  inlineButtons.value = [];
+  lastInlineBtnIdx.value = -1;
+  nextTick(() => { scrollToBottom(); });
+});
+
+const sendMessageAndScroll = (...args: Parameters<typeof sendMessage>): void => {
+  sendMessage(...args);
+  isScrollAnchored.value = true;
+  nextTick(() => { scrollToBottom(); });
+};
+
+function attachBlockDiagram() {
+  if (!blockDiagramEditor.value) {
+    showToastMessage("BlockDiagramEditor not found", 'error');
+    return;
+  }
+
+  const data = blockDiagramEditor.value.getData();
+  if (!data || !data.nodes.length) {
+    showToastMessage("Block diagram is empty", 'error');
+    return;
+  }
+
+  const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const defaultName = `Diagram - ${timestamp}`;
+  blockDiagramHistoryStore.addOrUpdateEntry(defaultName, data);
+  showToastMessage("Diagram saved to history", 'success');
+
+  showEditor.value = false;
+  showHistoryPanel.value = false;
+  const opt = options.value.find(o => o.attachId === 'Block diagram')!;
+  opt.value = data;
+  console.log("blockDiagramEditor", data)
+}
+
+function loadDiagramFromHistory(data: any) {
+  if (!blockDiagramEditor.value) {
+    showToastMessage("BlockDiagramEditor not found", 'error');
+    return;
+  }
+
+  blockDiagramEditor.value.setData(data);
+  showHistoryPanel.value = false;
+  showToastMessage("Diagram loaded from history", 'success');
+}
+
+function toggleHistoryPanel() {
+  showHistoryPanel.value = !showHistoryPanel.value;
+}
+
+function switchToChat(id: string) {
+  chatHistoryStore.switchToChat(id);
+}
+
+function scrollToBottom() {
+  const container = messagesContainer.value;
+  if (container) {
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    isScrollAnchored.value = true;
+    showScrollButton.value = false;
+  }
+  else {
+    console.warn("Fail scroll to bottom")
+  }
+}
+
+function isFirstInAiGroup(idx: number): boolean {
+  const msg = chatMessages.value[idx];
+  if (msg.role !== 'ai') return false;
+  const prevMsg = idx > 0 ? chatMessages.value[idx - 1] : null;
+  return !prevMsg || prevMsg.role !== 'ai';
+}
+
+function isLastInAiGroup(idx: number): boolean {
+  const msg = chatMessages.value[idx];
+  if (msg.role !== 'ai') return false;
+  const nextMsg = idx < chatMessages.value.length - 1 ? chatMessages.value[idx + 1] : null;
+  return !nextMsg || nextMsg.role !== 'ai';
+}
+
+function getFirstInGroupIdx(idx: number): number {
+  const msg = chatMessages.value[idx];
+  if (msg.role !== 'ai') return idx;
+
+  let firstIdx = idx;
+  for (let i = idx - 1; i >= 0; i--) {
+    if (chatMessages.value[i].role === 'ai') {
+      firstIdx = i;
+    } else {
+      break;
+    }
+  }
+  return firstIdx;
+}
+
+function onScroll() {
+  const container = messagesContainer.value;
+  if (container) {
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    isScrollAnchored.value = distanceFromBottom <= SCROLL_ANCHOR_THRESHOLD;
+    showScrollButton.value = !isScrollAnchored.value;
+  } else {
+    showScrollButton.value = false;
+  }
+}
+
+function handleAttachClick(event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  attachCtxMenu.value?.open(event);
+}
+
+function onPaste(event: ClipboardEvent) {
+  void handleClipboardPaste(event);
+}
+
+const attachMenuItems = [
+  {
+    icon: 'Cuboid',
+    label: 'Draw Block Diagram',
+    click: () => {
+      showEditor.value = true;
+    }
+  },
+  {
+    icon: 'Upload',
+    label: 'Upload File',
+    click: () => {
+      fileInput.value?.click();
+    }
+  }
+];
+
+// Auto-scroll during AI streaming
+let streamScrollInterval: ReturnType<typeof setInterval> | null = null;
+
+watch(isLoading, (loading) => {
+  nextTick(() => {
+    if (loading && isScrollAnchored.value) {
+      streamScrollInterval = setInterval(() => {
+        if (isScrollAnchored.value) {
+          scrollToBottomInstant();
+        }
+      }, 300);
+    } else {
+      if (streamScrollInterval) {
+        clearInterval(streamScrollInterval);
+        streamScrollInterval = null;
+      }
+    }
+  })
+});
+
+function scrollToBottomInstant() {
+  const container = messagesContainer.value;
+  if (container) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+onMounted(() => {
+  blockDiagramHistoryStore.initializeHistory();
+  document.addEventListener('paste', onPaste);
+})
+
+onUnmounted(() => {
+  if (streamScrollInterval) {
+    clearInterval(streamScrollInterval);
+    streamScrollInterval = null;
+  }
+  document.removeEventListener('paste', onPaste);
+})
+
+// Expose for parent
+defineExpose({
+  isLoading,
+});
+</script>
+
+<style scoped>
+.chat-view {
+  padding: 0;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  position: relative;
+  padding-bottom: 4px;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  padding-right: 1rem;
+  padding-bottom: 200px;
+}
+
+/* Placeholder styles when there are no messages */
+.messages.placeholder {
+  align-items: center;
+  /* justify-content: center; */
+  padding: 2rem;
+}
+
+.placeholder-content {
+  text-align: center;
+  color: var(--color-text-muted);
+  max-width: 420px;
+  margin: auto;
+}
+
+.recent-chats {
+  margin-bottom: 1.5rem;
+  text-align: left;
+  width: 100%;
+}
+
+.recent-chats-title {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.recent-chats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.recent-chat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0rem;
+  cursor: pointer;
+}
+
+.recent-chat-title {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty-title {
+  font-size: 1.25rem;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+}
+
+.empty-sub {
+  margin-bottom: 0.5rem;
+}
+
+.empty-hint {
+  font-size: 0.9rem;
+  color: var(--color-text-tertiary);
+}
+
+.input {
+  position: relative;
+}
+
+.input-area {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-area input {
+  flex: 1;
+  padding: 0.75rem;
+  background-color: var(--color-background-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.input-area input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.input-area .send-btn {
+  padding: 0.75rem;
+  color: var(--color-primary);
+  background-color: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  max-height: 54px;
+}
+
+.input-area .attach-btn {
+  padding: 0;
+  color: var(--color-text-on-surface);
+  align-items: flex-start;
+}
+
+.input-area .send-btn:disabled {
+  color: var(--color-border-dark);
+}
+
+.input-area .send-btn:hover {
+  color: var(--color-primary-dark);
+}
+
+.input-container {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border);
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  margin: 5px;
+  border-radius: 5px;
+  position: relative;
+  overflow: hidden;
+  --input-border-angle: 0turn;
+}
+
+.input-container>* {
+  position: relative;
+  z-index: 2;
+}
+
+.input-container-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(from var(--input-border-angle),
+      transparent 0deg,
+      transparent 245deg,
+      var(--color-border) 285deg,
+      var(--color-border) 325deg,
+      transparent 360deg);
+  animation: input-border-spin 1.4s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.input-container-loading::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 3px;
+  background: var(--color-background);
+  pointer-events: none;
+  z-index: 1;
+}
+
+@property --input-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0turn;
+}
+
+@keyframes input-border-spin {
+  to {
+    --input-border-angle: 1turn;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input-container-loading::before {
+    animation: none;
+  }
+}
+
+/* Disabled controls when loading */
+button[disabled],
+.input-option[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.input-options {
+  display: flex;
+  gap: 10px;
+  flex-direction: row;
+}
+
+.attached-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  max-height: 18vh;
+  overflow: auto;
+}
+
+.attached-file {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 240px;
+  padding: 0.25rem 0.45rem;
+  background-color: var(--color-background-secondary);
+  border: 1px dashed var(--color-border);
+  border-radius: 5px;
+  color: var(--color-text);
+  font-size: 10px;
+}
+
+.attached-file-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attached-file-size {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.attached-file-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.attached-file-remove:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.input-option {
+  font-size: 10px;
+  background-color: var(--color-background-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px dashed var(--color-border);
+  align-items: center;
+  display: flex;
+  padding: 0rem 0.5rem 0rem 0rem;
+  color: var(--color-text);
+}
+
+.input-option.active {
+  background-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+  border-color: var(--color-primary);
+}
+
+.input-header {
+  display: flex;
+  gap: 0.2rem;
+  bottom: 100%;
+  padding: 0px 10px;
+  position: absolute;
+  flex-direction: column-reverse;
+  width: calc(100% - 35px);
+  margin-right: 10px;
+}
+
+.inline-buttons {
+  display: flex;
+  gap: 0.23rem;
+}
+
+.inline-buttons .inline-button {
+  font-size: 10px;
+  padding: 0px 10px 0px 0px;
+  border: 1px solid var(--color-border);
+}
+
+.scroll-to-bottom-btn {
+  margin: 0 auto;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  z-index: 2;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.scroll-to-bottom-btn:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.error-container {
+  margin: 8px 0;
+}
+
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.message.ai .avatar {
+  background-color: var(--color-primary);
+  border-radius: 50%;
+  min-width: 32px;
+  max-width: 32px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-on-primary);
+}
+
+.open-editor-btn {
+  position: absolute;
+  right: 12%;
+  margin-top: -75px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 11;
+}
+
+.editor-overlay {
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-container {
+  display: flex;
+  flex: 1;
+  gap: 0;
+}
+
+.editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-history-panel {
+  position: absolute;
+  top: 70px;
+  right: 10px;
+  width: 280px;
+  max-height: calc(100vh - 150px);
+  margin-top: 0.25rem;
+  z-index: 200;
+}
+
+.editor-overlay-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px;
+}
+</style>

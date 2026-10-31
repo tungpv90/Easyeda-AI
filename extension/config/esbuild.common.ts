@@ -1,0 +1,24 @@
+import type esbuild from 'esbuild';
+import { resolve } from 'node:path';
+
+export default {
+	entryPoints: {
+		'index': './src/index',
+	},
+	entryNames: '[name]',
+	assetNames: '[name]',
+	bundle: true, // 用于内部方法调用，请勿修改
+	minify: true, // 用于内部方法调用，请勿修改
+	loader: {},
+	outdir: './dist/',
+	sourcemap: undefined,
+	platform: 'browser', // 用于内部方法调用，请勿修改
+	format: 'iife', // 用于内部方法调用，请勿修改
+	globalName: 'edaEsbuildExportName', // 用于内部方法调用，请勿修改
+	// Side-effect injection runs before entry dependencies and participates in watch builds.
+	inject: [resolve(__dirname, '../src/runtime-bootstrap.ts')],
+	treeShaking: true,
+	ignoreAnnotations: true,
+	define: {},
+	external: [],
+} satisfies Parameters<(typeof esbuild)['build']>[0];

@@ -1,0 +1,12 @@
+{
+  "name": "@copilot/shared",
+  "description": "Shared types, validation schemas, and protocol contracts for EasyEDA Copilot.",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "@jlceda/pro-api-types": "^0.2.30",
+    "zod": "^4.3.5"
+  },
+  "private": true
+}

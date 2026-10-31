@@ -1,0 +1,34 @@
+{
+	"name": "easyeda-copilot",
+	"version": "1.3.2",
+	"description": "AI-powered electronics design in EasyEDA Pro: schematic creation and editing, component search, PCB placement and routing, SPICE simulation, and design rule checks.",
+	"author": "echosystem",
+	"license": "MIT",
+	"homepage": "https://echosystem.ru/",
+	"scripts": {
+		"build:skill": "npm run build:skill --workspace=easyeda-copilot-mcp",
+		"dev": "npm run dev --workspace=@copilot/extension",
+		"dev:export-reused": "npm run dev:export-reused --workspace=@copilot/extension",
+		"build:vite": "npm run build:vite --workspace=@copilot/extension",
+		"compile": "npm run compile --workspace=@copilot/extension",
+		"eslint": "npm run eslint --workspace=@copilot/extension",
+		"build": "npm run build --workspace=@copilot/extension",
+		"build:installer": "npm run build --workspace=easyeda-copilot-mcp && node installer/build.mjs",
+		"deps:local": "node scripts/dependencies.mjs local",
+		"deps:release": "node scripts/dependencies.mjs release",
+		"deps:status": "node scripts/dependencies.mjs status",
+		"deps:build": "node scripts/build-local-dependencies.mjs",
+		"check:release": "node scripts/check-release.mjs",
+		"test:dependencies": "node --test scripts/dependencies.test.mjs",
+		"test:extension": "npm run test --workspace=@copilot/extension"
+	},
+	"engines": {
+		"node": "^20.19.0 || >=22.12.0"
+	},
+	"private": true,
+	"workspaces": [
+		"extension",
+		"shared",
+		"mcp"
+	]
+}

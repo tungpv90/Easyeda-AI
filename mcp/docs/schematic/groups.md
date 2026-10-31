@@ -1,0 +1,36 @@
+# Schematic groups
+
+Call `get_schematic_groups({})` on the intended schematic page to inspect likely component groupings and direct non-ground wire connections. Set `get_full_schematic_groups: true` to read every page and concatenate their page-local results. The full mode restores the previously active document and does not invent cross-page groups or wire islands. The tool is read-only. Use it alongside `get_schematic`, which supplies values, pin names and the electrical netlist.
+
+```ts
+interface SchematicGroups {
+  maybe_blocks: string[];
+  wires: { net: string | null; pins: string }[];
+  errors?: string[];
+  declared_blocks?: { name: string; refs: string; module?: string; attach_to?: string; role?: string;
+    conflicts?: ('module' | 'attach_to' | 'role')[] }[];
+  declared_modules?: { name: string; blocks: string[] }[];
+  declaration_errors?: { code: string; message: string; component?: string; block?: string; property?: string }[];
+}
+```
+
+```json
+{"maybe_blocks":["C1 C2 U8","C8 C9 U6"],"wires":[{"net":"3V3","pins":"C1.1 C2.1 U8.5"},{"net":"5V","pins":"C8.1 C9.1 U6.5"}]}
+```
+
+- `maybe_blocks` contains space-separated component references. The groups are suggestions, not a complete or authoritative partition; singletons and ambiguous components may be omitted.
+- A valid ASCII alphanumeric suffix after the last dot of a part name is appended to its block reference (`MAX942CSA+.2` → `U21.2`). A lone `.1` uses the base designator; `.1` is retained when multiple sections with the same designator are present on the page. Missing or invalid suffixes also use the base designator. No library lookup is performed. In `wires`, `U21.7` always means physical pin 7.
+- Each `wires` entry describes one continuous drawn wire island with at least two distinct pin references. Separate islands remain separate even when their net names match. Names recognized as ground, such as `GND`, `AGND`, `DGND` and `PGND`, are omitted. `null` means the net name is unknown.
+- Power flags, net labels and ports are not returned as components or pins. They may strengthen a block suggestion through resolved nets, but do not create a direct wire connection.
+
+## Declared blocks
+
+Designers can declare the PCB hierarchy with component properties: `PCB Block` (block name, required), `PCB Module`, `PCB Attach` (the block this one is a satellite of) and `PCB Role` (`power`, `mcu`, `connector`, …). Circuit assembly writes `PCB Block` from each component's `block_name`, keeping its other properties; net symbols get none. `beautify_schematic_on_current_page` and source-path `replace_components` rebuild components but restore the four properties the designer set; `block_name` only fills `PCB Block` where none was declared.
+
+- `declared_blocks` lists every block with at least one declared component, using the same references as `maybe_blocks`. Unlike `maybe_blocks`, it is explicit: one block may span pages in full mode, and its references are merged.
+- `PCB Module`, `PCB Attach` and `PCB Role` may be set on any member. Conflicting values within one block are reported in `declaration_errors` and omitted; the block is kept and lists the omitted attributes in `conflicts`. In full mode a conflict found on one page stays omitted even when another page declares a single value. `declared_modules` lists the modules of the declared blocks.
+- A package whose sections are declared in different blocks cannot be placed in one: it is reported in `declaration_errors` and left out of those blocks.
+- Each assembled instance gets only its own `PCB Block`. Copies of a component already on the page never inherit its `PCB Block`, `PCB Module`, `PCB Attach` or `PCB Role`.
+- `declaration_errors` concerns the declarations only and does not make `maybe_blocks` or `wires` partial. Each entry has a stable `code`: `PCB_DECLARATION_READ` (a component's properties could not be read; `component`), `PCB_DECLARATION_SECTIONS` (a package's sections are declared in different blocks; `component`), `PCB_DECLARATION_CONFLICT` (members disagree on an attribute; `block`, `property`), `PCB_DECLARATION_UNAVAILABLE` (declarations could not be built or merged) and `PCB_DECLARATION_MORE` (the tenth entry when more problems are in the editor log). Without declarations, these keys are absent.
+
+The response excludes page IDs, scores, geometry and library UUIDs. Full-mode arrays follow schematic page order, so repeated references from different pages are not deduplicated. Empty results are `{"maybe_blocks":[],"wires":[]}`. Optional `errors` are bounded, non-fatal diagnostics for a partial result; missing wires do not prove electrical isolation. An unreadable component list, wrong document type or page change remains a fatal error.
