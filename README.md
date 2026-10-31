@@ -1,41 +1,84 @@
-English | [简体中文](https://github.com/biosshot/easyeda-copilot/blob/main/README.zh-CN.md) | [Русский](https://github.com/biosshot/easyeda-copilot/blob/main/README.ru.md) | [Español](https://github.com/biosshot/easyeda-copilot/blob/main/README.es.md)
+English | [Tiếng Việt](README.vi.md)
 
-# <img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/extension/images/logo.png" alt="" width="42"> EasyEDA Copilot
+# <img src="extension/images/logo.png" alt="" width="42"> Easyeda-AI
 
-MCP-based engineering automation for native EasyEDA Pro and JLCEDA documents.
+Chat with Claude inside EasyEDA Pro, using your own Claude subscription, and let it work on your real schematic and PCB documents.
 
-EasyEDA Copilot connects MCP-capable AI agents to real schematic and PCB data. It supports schematic generation and reorganization, component resolution, constraint-driven PCB placement, checkpoint-backed routing transactions, structured design inspection, recovery, and native EasyEDA DRC.
+Easyeda-AI is a fork of [EasyEDA Copilot](https://github.com/biosshot/easyeda-copilot) by biosshot. It keeps everything EasyEDA Copilot does (schematic generation and reorganization, component resolution, constraint-driven PCB placement, checkpoint-backed routing, inspection, recovery and native DRC) and adds a **Claude Chat** dialog inside EasyEDA, so you no longer need a terminal or a separate MCP client.
 
 <p align="center">
-  <a href="https://github.com/biosshot/easyeda-copilot/actions/workflows/build.yml">
-    <img src="https://github.com/biosshot/easyeda-copilot/actions/workflows/build.yml/badge.svg" alt="Build status">
+  <a href="https://github.com/tungpv90/Easyeda-AI/releases/latest">
+    <img src="https://img.shields.io/github/v/release/tungpv90/Easyeda-AI?label=release" alt="Latest release">
   </a>
-  <a href="https://github.com/biosshot/easyeda-copilot/releases/latest">
-    <img src="https://img.shields.io/github/v/release/biosshot/easyeda-copilot?label=release" alt="Latest release">
-  </a>
-  <a href="https://github.com/biosshot/easyeda-copilot/blob/main/LICENSE">
+  <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
-  </a>
-  <a href="https://discord.gg/AXCGjTDYkq">
-    <img src="https://img.shields.io/badge/Discord-7289DA?logo=discord&logoColor=white" alt="Discord">
-  </a>
-  <a href="https://web.tribute.tg/d/PTf">
-    <img src="https://img.shields.io/badge/Support%20development-Tribute-24A1DE" alt="Support EasyEDA Copilot development">
   </a>
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/banner.gif" alt="EasyEDA Copilot creating and assembling an LDO schematic from a text specification">
+  <img src="docs/media/banner.gif" alt="Creating and assembling an LDO schematic from a text specification">
 </p>
 <p align="center">
   <sub>Creating and assembling an LDO schematic from a text specification.</sub>
 </p>
 
-## Featured demonstration: BGA2869 2 GHz RF amplifier
+## Quick start: Claude Chat (Windows)
 
-A complete RF design workflow inside EasyEDA Pro: schematic organization, pin-level signal-path constraints, compact component placement, PCB routing, ground planes, and via stitching.
+You need EasyEDA Pro Desktop and a Claude account (Pro or Max subscription, or an Anthropic Console account). You do not need Node.js or a terminal.
 
-The RF ports are positioned on opposite board edges, the amplifier chain is kept ordered, and the bias network is placed close to the MMIC. The resulting components, tracks, vias, and copper zones remain editable as native EasyEDA objects.
+1. Download both files from the [latest release](https://github.com/tungpv90/Easyeda-AI/releases/latest):
+   - [`easyeda-copilot_v1.3.2.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.2.eext): the EasyEDA extension
+   - [`ClaudeChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe): the local helper installer
+2. In EasyEDA Pro, open `Settings → Extensions → Extensions Manager → Import Extensions`, choose the `.eext` file, and enable **External Interactions**.
+
+   <p align="center">
+     <a href="docs/media/params.png"><img src="docs/media/params.png" alt="Enable External Interactions for the extension" width="560"></a>
+   </p>
+
+3. Double-click `ClaudeChatSetup.exe` once. It:
+   - installs Claude Code with Anthropic's official installer if it is missing;
+   - copies the helper to `%LOCALAPPDATA%\EasyEDA Copilot\Claude Chat`;
+   - starts the helper now and at every Windows login.
+4. In EasyEDA Pro, open `Copilot → Claude Chat`. If Claude Code is not signed in yet, select **Sign in with Claude** and finish the sign-in in your browser.
+
+Ask in any language, for example "Review this schematic and list wiring mistakes" or "Check the PCB for DRC errors and explain the important ones".
+
+Windows may show "Windows protected your PC" the first time, because the installer is not code-signed. Select **More info → Run anyway**. To update, run the newer `ClaudeChatSetup.exe`. To remove the helper, run `ClaudeChatSetup.exe --uninstall`.
+
+### What the dialog does
+
+- Streams Claude's replies and shows each EasyEDA tool call with its result.
+- Runs the EasyEDA tools without prompts. Document changes are checkpoint-backed and can be restored.
+- Asks **Allow / Always allow / Deny** before anything else, such as fetching a web page.
+- Shows your 5-hour and 7-day subscription usage, and lets you choose a model (Default, Opus, Sonnet, Haiku), stop a reply, or start a new conversation.
+- Cannot run shell commands or edit files on your computer.
+
+### Why a separate installer
+
+EasyEDA extensions run in a sandbox and cannot start programs. The helper runs your own Claude Code installation in the background and connects it to the dialog. It uses Claude Code's sign-in and never reads or stores your Claude credentials.
+
+Details, settings and troubleshooting: [docs/claude-chat.md](docs/claude-chat.md).
+
+## Alternative: use your own MCP client
+
+You can also drive EasyEDA from Claude Code, Codex or another MCP client in a terminal, as in upstream EasyEDA Copilot. Install the `.eext` as above, then add the MCP server (requires Node.js >= 20.19):
+
+```bash
+claude mcp add easyeda-copilot -- npx -y easyeda-copilot-mcp
+# or
+codex mcp add easyeda-copilot -- npx -y easyeda-copilot-mcp
+```
+
+`npx easyeda-copilot-mcp` installs the published upstream package. It provides the same EasyEDA tools; only the Claude Chat helper is specific to this fork. For generic MCP configuration, local builds and the standalone skill, see the [MCP package documentation](mcp/README.md) and the [skill installation guide](mcp/docs/install-guide.md).
+
+Open EasyEDA Pro and the target document, then ask the agent to inspect the open project. The extension finds the local MCP bridge by itself; `Copilot → MCP` pauses or resumes the connection.
+
+## Demonstrations
+
+These videos come from upstream EasyEDA Copilot. They use the same tools that Claude Chat uses. Every result stays editable as a normal EasyEDA project.
+
+<details>
+<summary><strong>BGA2869 2 GHz RF amplifier</strong>: schematic organization, signal-path constraints, compact placement, routing, ground planes and via stitching</summary>
 
 <video controls preload="metadata" width="100%">
   <source src="https://github.com/user-attachments/assets/b3b3b25a-bc27-4654-8802-23775ff71735" type="video/mp4">
@@ -44,18 +87,10 @@ The RF ports are positioned on opposite board edges, the amplifier chain is kept
 
 [Open video separately](https://github.com/user-attachments/assets/b3b3b25a-bc27-4654-8802-23775ff71735)
 
-## More demonstrations
+</details>
 
-These examples cover larger controller boards and existing-document workflows. Every result remains editable as a normal EasyEDA project rather than being exported as a rendered mockup.
-
-### ESP32-C3 controller
-
-A complete ESP32-C3 controller with power conversion, USB, CAN, RS-485, protected field I/O, external connectors, and antenna placement constraints.
-
-The workflow demonstrates multi-page schematic generation, functional placement, board-edge and antenna constraints, power and signal routing, copper planes, via stitching, inspection, and DRC-driven repair.
-
-<details open>
-<summary><strong>Watch the ESP32-C3 workflow (69 seconds)</strong></summary>
+<details>
+<summary><strong>ESP32-C3 controller</strong>: multi-page schematic, power conversion, USB, CAN, RS-485, antenna constraints, routing and DRC-driven repair</summary>
 
 <video controls preload="metadata" width="100%">
   <source src="https://github.com/user-attachments/assets/df1dd4e2-ee48-492c-badb-de2dc220ae41" type="video/mp4">
@@ -66,12 +101,8 @@ The workflow demonstrates multi-page schematic generation, functional placement,
 
 </details>
 
-### MIMXRT1011 controller
-
-A dense four-layer microcontroller design demonstrating placement and routing around a high-pin-count MCU, multiple interfaces, decoupling groups, board-edge connectors, mounting holes, and mechanical access constraints.
-
-<details open>
-<summary><strong>Watch the MIMXRT1011 workflow (128 seconds)</strong></summary>
+<details>
+<summary><strong>MIMXRT1011 controller</strong>: dense four-layer board around a high-pin-count MCU</summary>
 
 <video controls preload="metadata" width="100%">
   <source src="https://github.com/user-attachments/assets/757690b8-83cd-42c7-b88f-4db9ba2df010" type="video/mp4">
@@ -82,12 +113,8 @@ A dense four-layer microcontroller design demonstrating placement and routing ar
 
 </details>
 
-### Schematic beautification
-
-EasyEDA Copilot reads an existing schematic, identifies functional groups, saves a document checkpoint, and reassembles the page into named blocks while retaining its electrical connectivity and component identities.
-
-<details open>
-<summary><strong>Watch schematic beautification (13 seconds)</strong></summary>
+<details>
+<summary><strong>Schematic beautification</strong>: reorganize an existing page into named functional blocks</summary>
 
 <video controls preload="metadata" width="100%">
   <source src="https://github.com/user-attachments/assets/d77218e5-4f6f-42b8-bea4-7f7240f8f7f3" type="video/mp4">
@@ -100,72 +127,13 @@ EasyEDA Copilot reads an existing schematic, identifies functional groups, saves
 
 More editable examples are available on [OSHWLab](https://oshwlab.com/biosshot/edacopilotexamples).
 
-## Quick start
-
-### Requirements
-
-- EasyEDA Pro Desktop;
-- Node.js >=20.19;
-- an MCP-capable client such as Codex or Claude Code.
-
-### 1. Install the EasyEDA extension
-
-Download the latest `.eext` package from [GitHub Releases](https://github.com/biosshot/easyeda-copilot/releases/latest).
-
-In EasyEDA Pro:
-
-1. Open `Settings -> Extensions -> Extensions Manager`.
-2. Select `Import Extensions`.
-3. Choose the downloaded `.eext` file.
-4. Enable `External Interactions`.
-
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/params.png">
-    <img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/params.png" alt="Enable External Interactions for EasyEDA Copilot" width="560">
-  </a>
-</p>
-
-### 2. Add the MCP server
-
-Codex:
-
-```bash
-codex mcp add easyeda-copilot -- npx -y easyeda-copilot-mcp
-```
-
-Claude Code:
-
-```bash
-claude mcp add easyeda-copilot -- npx -y easyeda-copilot-mcp
-```
-
-For generic MCP configuration and local builds, see the [MCP package documentation](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/README.md).
-
-To use the standalone skill instead of MCP client configuration, build it from this repository. Skill archives are not published in Releases:
-
-```bash
-npm ci
-npm run build:skill
-cd skill/scripts/runtime
-npm install --omit=dev
-```
-
-Then install the generated `skill/` directory as described in the [skill installation guide](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/install-guide.md).
-
-### 3. Open a project
-
-1. Start the MCP client with EasyEDA Copilot enabled.
-2. Open EasyEDA Pro and the target schematic or PCB document.
-3. Ask the agent to inspect the currently opened EasyEDA project and begin the design workflow.
-
-The extension discovers the local MCP bridge automatically. `Copilot -> MCP` pauses or resumes the connection.
-
 ## Capabilities
 
 | Area            | Capabilities                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Chat in EasyEDA | Claude Chat dialog with your Claude subscription, streaming replies, tool activity, permission prompts and usage display                                                                                      |
 | Schematics      | Inspect the current page, create and complete circuits, reorganize existing schematics into functional blocks, and annotate designators across multiple pages                                                |
-| Components      | Resolve EasyEDA components by manufacturer MPN or part UUID                                                                                                      |
+| Components      | Resolve EasyEDA components by manufacturer MPN or part UUID                                                                                                                                                  |
 | PCB placement   | Generate board geometry and constraint-driven placement using functional blocks, modules, pin proximity, ordered signal paths, edge placement, keepouts, mounting holes, thermal pads, and preserved objects |
 | PCB routing     | Define net classes, signal and power nets, copper planes, differential pairs, matched groups, fanout, impedance intent, selective rerouting, and via stitching                                               |
 | Inspection      | Render layer-aware PCB previews, highlight nets and components, and inspect routed length, track widths, layers, vias, pads, polygons, nearby components, and unrouted connections                           |
@@ -175,7 +143,7 @@ The extension discovers the local MCP bridge automatically. `Copilot -> MCP` pau
 
 ## Checkpoints, transactions, and recovery
 
-EasyEDA Copilot uses full-document checkpoints and explicit application boundaries to protect existing engineering work. Changes are previewed, applied to native EasyEDA documents, inspected, and then kept, repaired, or restored.
+Changes are previewed, applied to native EasyEDA documents, inspected, and then kept, repaired, or restored. Checkpoints contain the complete EasyEDA document source, not only a list of agent actions.
 
 | Workflow                        | Protection and recovery behavior                                                                                                                  |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -187,215 +155,79 @@ EasyEDA Copilot uses full-document checkpoints and explicit application boundari
 | Routing application failure     | Restores the pre-routing checkpoint automatically                                                                                                 |
 | Manual recovery                 | Lists, saves, and restores checkpoints explicitly for the current EasyEDA document                                                                |
 
-Checkpoints contain the complete EasyEDA document source, not only a list of agent actions. Existing tracks, vias, and copper zones are preserved by default and treated as fixed routing obstacles. Copper is replaced only when a routing program explicitly selects the affected nets and object types through `clearRouting(...)`.
+Existing tracks, vias, and copper zones are preserved by default and treated as fixed routing obstacles. Copper is replaced only when a routing program explicitly selects the affected nets and object types through `clearRouting(...)`. Recovery protects the document from failed changes; electrical and manufacturability review remains part of the normal engineering workflow.
 
-A successfully applied partial routing result remains available for inspection and focused repair. An application exception restores the pre-routing checkpoint. Recovery protects the document from failed mutations; electrical and manufacturability review remains part of the normal engineering workflow.
+## Schematic and PCB workflows
 
-## Schematic workflow
-
-The schematic integration works with structured EasyEDA component, pin, net, and page data.
+Schematic work:
 
 1. Inspect the current project and schematic page.
-2. Resolve exact components.
-3. Save a document checkpoint.
-4. Create a circuit, complete an existing fragment, replace selected components, or reorganize the page into named functional blocks.
-5. Apply the result to the native EasyEDA document.
-6. Save and inspect the result, then keep, revise, or restore it.
+2. Resolve exact components and save a checkpoint.
+3. Create a circuit, complete an existing fragment, replace components, or reorganize the page into named functional blocks.
+4. Apply the result to the EasyEDA document, inspect it, then keep, revise, or restore it.
 
-Schematic beautification covers the complete current page and preserves component identities through destructive reassembly. Multi-page annotation supports two modes: `preserve` repairs only duplicate or unnumbered designators, while `resequence` recalculates trailing numbers in page and position order. Multi-part components are renamed together.
+PCB work:
 
-## PCB workflow
+1. Synchronize the schematic with its PCB and inspect schematic groups, board outline, footprints, layers and DRC rules.
+2. Describe mechanical, functional and electrical intent in the placement DSL; review the previews; assemble the approved placement.
+3. Define stack, rules, net classes, planes, special nets, fanout and via stitching in the routing DSL; apply it as one checkpoint-backed transaction.
+4. Inspect critical nets, remaining connections, copper and native DRC; keep, repair, or restore.
 
-PCB placement, routing, inspection, and DRC are provided through the MCP interface.
+References: [PCB placement instructions](mcp/docs/pcb-layout/instructions.md), [placement DSL](mcp/docs/pcb-layout/dsl.ts), [mechanical validation](mcp/docs/pcb-layout/mechanical-validation.md), [PCB routing instructions](mcp/docs/pcb-routing/instructions.md), [routing DSL](mcp/docs/pcb-routing/dsl.ts), [verification and recovery](mcp/docs/verification.md).
 
-1. Synchronize the schematic with its linked PCB document.
-2. Inspect schematic groups and complete connectivity to identify provisional functional blocks and local passive ownership.
-3. Inspect the current board outline, footprints, placement, copper layers, and DRC rules.
-4. Describe mechanical, functional, and electrical intent in the placement DSL.
-5. Review the mechanical preview and the final placement preview.
-6. Assemble the approved placement in the opened EasyEDA PCB document.
-7. Define stack, routing rules, net classes, planes, special nets, fanout, and via stitching in the routing DSL.
-8. Apply the routing program as one checkpoint-backed transaction.
-9. Inspect critical nets, remaining connections, copper, and native DRC results.
-10. Keep the result, apply a focused repair, or restore the previous checkpoint.
+## Architecture
 
-Existing placement can be retained with `preserve(...)`. Placement assembly preserves existing copper and unrelated board objects. Existing routing is preserved unless the routing DSL explicitly calls `clearRouting(...)` for a selected scope.
+```text
+Claude Chat dialog (EasyEDA)                      Claude Code / Codex / other MCP client
+        |                                                        |
+        | WebSocket 127.0.0.1:8788                               | stdio
+        v                                                        |
+Claude Chat helper ── runs ──> claude -p (your sign-in)          |
+        |                            |                           |
+        |                            | stdio                     |
+        |                            v                           v
+        |                     easyeda-copilot MCP server <───────┘
+        |                            |
+        └──── WebSocket 127.0.0.1:8787 (bridge) ────┐
+                                                    v
+                                     EasyEDA Copilot extension ──> open EasyEDA document
+```
 
-Long placement and routing operations return an operation ID. The MCP client can wait for completion, cancel the work, or retry application of an already prepared result without running the operation again.
-
-Detailed placement and routing references:
-
-- [PCB placement instructions](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/pcb-layout/instructions.md)
-- [PCB placement DSL](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/pcb-layout/dsl.ts)
-- [Mechanical validation](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/pcb-layout/mechanical-validation.md)
-- [PCB routing instructions](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/pcb-routing/instructions.md)
-- [PCB routing DSL](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/pcb-routing/dsl.ts)
-- [Verification and recovery](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/verification.md)
-
-<details>
-<summary><strong>PCB comparison gallery: EasyEDA Copilot and Quilter</strong></summary>
-
-Earlier side-by-side examples show the PCB results produced for the same RP2040, PICO Duck, and ESPower designs.
-
-#### RP2040 board
-
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_copilot_top.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_copilot_top.png" alt="RP2040 PCB produced with EasyEDA Copilot, top layer" width="48%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_quiliter_top.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_quiliter_top.png" alt="RP2040 PCB produced with Quilter, top layer" width="48%"></a>
-</p>
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_copilot_bot.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_copilot_bot.png" alt="RP2040 PCB produced with EasyEDA Copilot, bottom layer" width="48%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_quiliter_bot.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/rp2040_quiliter_bot.png" alt="RP2040 PCB produced with Quilter, bottom layer" width="48%"></a>
-</p>
-
-#### PICO Duck compact board
-
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_copilot_top.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_copilot_top.png" alt="PICO Duck PCB produced with EasyEDA Copilot, top layer" width="48%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_quilter_top.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_quilter_top.png" alt="PICO Duck PCB produced with Quilter, top layer" width="48%"></a>
-</p>
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_copilot_bot.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_copilot_bot.png" alt="PICO Duck PCB produced with EasyEDA Copilot, bottom layer" width="48%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_quilter_bot.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/pico_duck_quilter_bot.png" alt="PICO Duck PCB produced with Quilter, bottom layer" width="48%"></a>
-</p>
-
-#### ESPower board
-
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_copilot_top.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_copilot_top.png" alt="ESPower PCB produced with EasyEDA Copilot, top layer" width="48%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_quiliter_top.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_quiliter_top.png" alt="ESPower PCB produced with Quilter, top layer" width="48%"></a>
-</p>
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_copilot_bot.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_copilot_bot.png" alt="ESPower PCB produced with EasyEDA Copilot, bottom layer" width="48%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_quiliter_bot.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/pcb-examples/espower_quiliter_bot.png" alt="ESPower PCB produced with Quilter, bottom layer" width="48%"></a>
-</p>
-
-</details>
+- The helper accepts connections only from EasyEDA (checked by `Origin` and `Host`), so web pages cannot drive Claude on your computer.
+- The MCP bridge talks to the extension only on `127.0.0.1`.
+- Components are resolved and placement plans are generated locally by the [`eda-copilot-backend`](https://github.com/biosshot/eda-copilot-backend) library; routing uses [`eda-copilot-router`](https://github.com/biosshot/eda-copilot-router).
 
 ## Compatibility
 
-| EasyEDA Pro version | Status   |
-| ------------------- | -------- |
-| Desktop V3.2.149    | Verified |
-| Desktop V2.2.47     | Verified |
-| Desktop V2.2.45     | Verified |
+| Component             | Status                                                            |
+| --------------------- | ----------------------------------------------------------------- |
+| EasyEDA Pro Desktop   | V3.2.209 used with Claude Chat; V3.2.149, V2.2.47 and V2.2.45 verified upstream |
+| Claude Chat installer | Windows x64. On macOS and Linux, run the helper from source (see below) |
+| Claude Code           | Tested with 2.1.314                                               |
 
-PCB assembly, routing integration, inspection, and native DRC are verified primarily against EasyEDA Pro Desktop V3.2.149.
+## Building from source
 
-## MCP and the legacy built-in interface
-
-MCP is the primary and actively developed EasyEDA Copilot interface. The original built-in interface remains available for its integrated chat and SPICE workflow.
-
-| Capability                               | MCP     | Built-in interface   |
-| ---------------------------------------- | ------- | -------------------- |
-| Generate and modify schematics           | Yes     | Yes, legacy workflow |
-| Component resolution | Yes     | Yes                  |
-| Checkpoints and automatic recovery       | Yes     | Limited              |
-| Project and document management          | Yes     | No                   |
-| PCB placement, preview, and assembly     | Yes     | No                   |
-| PCB routing, inspection, layers, and DRC | Yes     | No                   |
-| Multiple connected EasyEDA instances     | Yes     | No                   |
-| Integrated chat and SPICE UI             | No      | Yes                  |
-| Development priority                     | Primary | Limited maintenance  |
-
-New workflows and bug reports should use MCP unless the issue is specific to the legacy interface.
-
-<details>
-<summary>Show the legacy built-in interface</summary>
-
-The original interface provides an integrated chat workflow for schematic generation, circuit completion, component selection, and SPICE simulation. These demonstrations use the legacy interface; MCP remains the recommended integration for new agent workflows.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/main.png" alt="EasyEDA Copilot legacy built-in interface">
-</p>
-
-#### Circuit completion
-
-Read an existing schematic fragment, add the missing components, and complete its electrical connections.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/circuit-compl-ex1.gif" alt="Completing an existing EasyEDA schematic, example one" width="48%">
-  <img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/circuit-compl-ex2.gif" alt="Completing an existing EasyEDA schematic, example two" width="48%">
-</p>
-
-#### Component selection
-
-Search the LCSC catalog from engineering requirements and compare candidate parts without leaving the design workflow.
-
-<p align="center">
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/comp-search-ex1.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/comp-search-ex1.png" alt="Component selection from an engineering request" width="32%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/comp-search-ex2.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/comp-search-ex2.png" alt="LCSC component search results in EasyEDA Copilot" width="32%"></a>
-  <a href="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/comp-search-ex3.png"><img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/comp-search-ex3.png" alt="Selecting a component candidate in EasyEDA Copilot" width="32%"></a>
-</p>
-
-#### SPICE simulation
-
-Run a SPICE simulation from the built-in interface and inspect the selected component models together with the resulting plots.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/biosshot/easyeda-copilot/main/docs/media/spice.gif" alt="Running a SPICE simulation in the EasyEDA Copilot built-in interface">
-</p>
-
-</details>
-
-## Architecture and data processing
-
-```text
-Codex / Claude Code / another MCP client
-                    |
-                    | stdio
-                    v
-          easyeda-copilot-mcp
-                    |
-                    | WebSocket on 127.0.0.1:8787
-                    v
-        EasyEDA Copilot extension
-                    |
-                    v
-          Open EasyEDA document
-```
-
-The EasyEDA extension, MCP bridge, document application logic, checkpoint system, inspection tools, and PCB routing package are open source. The MCP bridge communicates with the EasyEDA extension locally through `127.0.0.1`.
-
-The standalone [`eda-copilot-backend`](https://github.com/biosshot/eda-copilot-backend) npm library resolves components through public EasyEDA APIs and generates schematic and PCB placement plans locally. Plans are applied, checkpointed, inspected, and DRC-checked through the EasyEDA extension. The legacy built-in chat uses its own service configuration. PCB routing is based on the open-source [`eda-copilot-router`](https://github.com/biosshot/eda-copilot-router) package.
-
-## Documentation
-
-- [MCP package and client configuration](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/README.md)
-- [Complete MCP workflow](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/workflow.md)
-- [Schematic workflow](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/schematic/workflow.md)
-- [Schematic circuit modifications](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/schematic/circuit-mod.md)
-- [Project and page management](https://github.com/biosshot/easyeda-copilot/blob/main/mcp/docs/schematic/project-and-pages.md)
-- [Settings and permissions](https://github.com/biosshot/easyeda-copilot/blob/main/docs/settings.md)
-- [Attaching circuits to an AI agent](https://github.com/biosshot/easyeda-copilot/blob/main/docs/attaching-circuits.md)
-- [Assembling circuits from an AI agent](https://github.com/biosshot/easyeda-copilot/blob/main/docs/assembling-circuits.md)
-
-## Development
-
-Extension sources, UI, resources and build configuration live in `extension/`; `mcp/` and `shared/` are sibling workspaces. Root build and development commands remain the entry point. The `.eext` output is written to `build/dist/`. See [extension development](https://github.com/biosshot/easyeda-copilot/blob/main/extension/README.md).
-
-Build the extension and MCP package from source:
+Requires Node.js ^20.19.0 or >= 22.12.0.
 
 ```bash
-git clone https://github.com/biosshot/easyeda-copilot.git
-cd easyeda-copilot
+git clone https://github.com/tungpv90/Easyeda-AI.git
+cd Easyeda-AI
 npm ci
-npm run build
+npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.2.eext
+npm run build:installer    # helper     -> build/dist/ClaudeChatSetup.exe (Windows)
 npm run check --workspace=mcp
 ```
 
-Published backend/router packages are installed by default. For joint development, dependency switching, and platform limits, see [local development](https://github.com/biosshot/easyeda-copilot/blob/main/docs/local-development.md). Building the extension requires Node ^20.19.0 or >=22.12.0.
+- On macOS, Linux, or during development, run the helper with Node instead of the installer: `node mcp/dist/index.js chat --install`, or `node mcp/dist/index.js chat` to keep it in the foreground.
+- Source layout: `extension/` (EasyEDA extension and dialogs), `mcp/` (MCP server and the Claude Chat helper in `mcp/src/chat/`), `installer/` (Windows installer), `shared/` (shared types).
+- More detail: [extension development](extension/README.md), [local development](docs/local-development.md), [documentation index](docs/README.md).
 
-The standalone PCB routing package is developed in [`biosshot/eda-copilot-router`](https://github.com/biosshot/eda-copilot-router).
+## Terms
 
-## Support
+The helper drives the Claude Code CLI that each user installs and signs in to themselves. Use follows [Anthropic's terms](https://www.anthropic.com/legal). If you redistribute this as a product for other people, check those terms first: third-party products are generally expected to use API-key authentication rather than offer claude.ai sign-in.
 
-If EasyEDA Copilot saves you engineering time, you can [support its continued development through Tribute](https://web.tribute.tg/d/PTf). Contributions help maintain the extension, MCP integration, routing tools, documentation, and new design workflows.
+## Credits and license
 
-## Community
+Built on [EasyEDA Copilot](https://github.com/biosshot/easyeda-copilot) by biosshot. Upstream community: [Discord](https://discord.gg/AXCGjTDYkq); to support upstream development: [Tribute](https://web.tribute.tg/d/PTf). Translated upstream READMEs ([简体中文](README.zh-CN.md), [Русский](README.ru.md), [Español](README.es.md)) do not yet cover Claude Chat.
 
-Questions, bug reports, design examples, and contributions are welcome through [GitHub Issues](https://github.com/biosshot/easyeda-copilot/issues) and [Discord](https://discord.gg/AXCGjTDYkq).
-
-## License
-
-EasyEDA Copilot is distributed under the [MIT License](https://github.com/biosshot/easyeda-copilot/blob/main/LICENSE).
+Distributed under the [MIT License](LICENSE).
