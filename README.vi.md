@@ -27,7 +27,7 @@ Easyeda-AI là bản fork của [EasyEDA Copilot](https://github.com/biosshot/ea
 Cần có EasyEDA Pro Desktop và một tài khoản Claude: gói Pro hoặc Max, hoặc tài khoản Anthropic Console. Không cần Node.js, không cần terminal.
 
 1. Tải hai file trong [bản phát hành mới nhất](https://github.com/tungpv90/Easyeda-AI/releases/latest):
-   - [`easyeda-copilot_v1.3.2.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.2.eext): extension cho EasyEDA
+   - [`easyeda-copilot_v1.3.3.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.3.eext): extension cho EasyEDA
    - [`ClaudeChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe): trình cài helper chạy trên máy
 2. Trong EasyEDA Pro, vào `Settings → Extensions → Extensions Manager → Import Extensions`, chọn file `.eext`, rồi bật **External Interactions**.
 
@@ -50,7 +50,9 @@ Lần đầu chạy, Windows có thể báo "Windows protected your PC" vì trì
 - Hiện câu trả lời của Claude theo thời gian thực, kèm từng lần gọi tool EasyEDA và kết quả.
 - Chạy các tool EasyEDA mà không hỏi lại. Mọi thay đổi trên tài liệu đều có checkpoint để khôi phục.
 - Hỏi **Allow / Always allow / Deny** trước mọi thao tác khác, ví dụ tải một trang web.
-- Hiện mức dùng gói Claude trong 5 giờ và 7 ngày. Cho chọn model (Default, Opus, Sonnet, Haiku), dừng câu trả lời, hoặc bắt đầu cuộc trò chuyện mới.
+- Hiện mức dùng gói Claude trong 5 giờ và 7 ngày. Cho dừng câu trả lời hoặc bắt đầu cuộc trò chuyện mới.
+- Liệt kê các model mà tài khoản Claude của bạn dùng được (Opus, Sonnet, Fable, Haiku và các phiên bản cũ hơn), kèm ID, context window, giới hạn output và giá API của từng model. Cho chọn mức effort.
+- Lưu lịch sử các cuộc trò chuyện. Mở lại một cuộc trò chuyện cũ để nói tiếp: Claude vẫn nhớ những gì đã trao đổi.
 - Không chạy được lệnh shell và không sửa được file trên máy bạn.
 
 ### Vì sao cần trình cài đặt riêng
@@ -213,7 +215,7 @@ Cần Node.js ^20.19.0 hoặc >= 22.12.0.
 git clone https://github.com/tungpv90/Easyeda-AI.git
 cd Easyeda-AI
 npm ci
-npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.2.eext
+npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.3.eext
 npm run build:installer    # helper     -> build/dist/ClaudeChatSetup.exe (Windows)
 npm run check --workspace=mcp
 ```

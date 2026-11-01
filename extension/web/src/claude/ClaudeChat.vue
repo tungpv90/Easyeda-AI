@@ -10,12 +10,16 @@
       </div>
       <div class="actions">
         <span v-if="usageText" class="muted usage" title="Claude subscription usage (5-hour / 7-day window)">{{ usageText }}</span>
-        <select v-model="model" :disabled="busy" title="Model">
-          <option value="">Default</option>
-          <option value="opus">Opus</option>
-          <option value="sonnet">Sonnet</option>
-          <option value="haiku">Haiku</option>
-        </select>
+        <ModelPicker
+          v-if="ready"
+          v-model="model"
+          v-model:effort="effort"
+          :models="models"
+          :source="modelsSource"
+          :disabled="busy"
+          @refresh="requestModels(true)"
+        />
+        <button class="ghost" :class="{ active: showHistory }" :disabled="!ready" title="Earlier conversations" @click="showHistory = !showHistory">History</button>
         <button class="ghost" :disabled="!ready" title="Start a new conversation" @click="newChat">New</button>
         <button v-if="account?.loggedIn" class="ghost" title="Sign out of Claude Code" @click="logout">Sign out</button>
       </div>
@@ -63,7 +67,21 @@
 
     <section v-else-if="!account" class="panel"><p class="muted">Checking Claude sign-in…</p></section>
 
-    <!-- 3. Chat -->
+    <!-- 3. History -->
+    <HistoryPanel
+      v-else-if="showHistory"
+      :conversations="conversations"
+      :current-id="currentConversationId"
+      :models="models"
+      :busy="busy"
+      :disabled="!ready"
+      @open="openConversation"
+      @delete="deleteConversation"
+      @new="newChat"
+      @close="showHistory = false"
+    />
+
+    <!-- 4. Chat -->
     <template v-else>
       <div v-if="noEasyEda" class="notice">
         This EasyEDA window is not connected to the helper yet. It usually connects within a few seconds;
@@ -120,9 +138,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
-import type { ClaudeChatAccount, ClaudeChatServerMessage, ClaudeChatUsage } from '@copilot/shared/types/claude-chat';
+import type {
+  ClaudeChatAccount,
+  ClaudeChatConversationSummary,
+  ClaudeChatModel,
+  ClaudeChatServerMessage,
+  ClaudeChatUsage,
+} from '@copilot/shared/types/claude-chat';
+import { BUILTIN_CLAUDE_MODELS } from '@copilot/shared/claude-models';
 import { markdown } from '../utils/markdown';
 import { ChatConnection, openExternal, type ConnectionStatus } from './connection';
+import HistoryPanel from './HistoryPanel.vue';
+import ModelPicker from './ModelPicker.vue';
 
 type Item =
   | { kind: 'user'; key: string; text: string }
@@ -131,8 +158,9 @@ type Item =
   | { kind: 'permission'; key: string; requestId: string; toolName: string; summary: string; description?: string; resolved?: 'allow' | 'deny' }
   | { kind: 'error'; key: string; text: string };
 
-const STORAGE_KEY = 'easyeda-copilot-claude-chat';
-const MAX_STORED_ITEMS = 300;
+/** Conversations used to be kept here; the helper stores them now. */
+const LEGACY_STORAGE_KEY = 'easyeda-copilot-claude-chat';
+const PREFS_KEY = 'easyeda-copilot-claude-chat-prefs';
 
 const examples = [
   'Summarize the schematic on the current page.',
@@ -147,10 +175,18 @@ const account = ref<ClaudeChatAccount>();
 const usage = ref<ClaudeChatUsage>();
 const instanceCount = ref<number>();
 const busy = ref(false);
-const model = ref('');
+const prefs = loadPrefs();
+const model = ref(prefs.model);
+const effort = ref(prefs.effort);
+const models = ref<ClaudeChatModel[]>(BUILTIN_CLAUDE_MODELS);
+const modelsSource = ref<'claude-code' | 'builtin'>('builtin');
+let modelsRequested = false;
+const conversations = ref<ClaudeChatConversationSummary[]>([]);
+const currentConversationId = ref<string>();
+const showHistory = ref(false);
 const draft = ref('');
 const helperMissing = ref(false);
-const items = ref<Item[]>(loadItems());
+const items = ref<Item[]>([]);
 const scroller = ref<HTMLElement>();
 const inputEl = ref<HTMLTextAreaElement>();
 const login = reactive({ active: false, url: '', code: '', error: '' });
@@ -181,24 +217,32 @@ function nextKey() {
   return `${Date.now().toString(36)}-${keyCounter}`;
 }
 
-function loadItems(): Item[] {
+function loadPrefs(): { model: string; effort: string } {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Item[]) : [];
-    // A stored permission prompt can no longer be answered.
-    return parsed.map(item => (item.kind === 'permission' && !item.resolved ? { ...item, resolved: 'deny' } : item));
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    const parsed = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    return {
+      model: typeof parsed.model === 'string' ? parsed.model : '',
+      effort: typeof parsed.effort === 'string' ? parsed.effort : '',
+    };
   } catch {
-    return [];
+    return { model: '', effort: '' };
   }
 }
 
-watch(items, value => {
+watch([model, effort], ([modelValue, effortValue]) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value.slice(-MAX_STORED_ITEMS)));
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ model: modelValue, effort: effortValue }));
   } catch {
     // Storage can be unavailable; the chat still works.
   }
-}, { deep: true });
+});
+
+// A model that does not support the chosen effort level runs at its default.
+watch([models, model], () => {
+  const selected = models.value.find(item => item.value === model.value);
+  if (selected && effort.value && !(selected.effortLevels ?? []).includes(effort.value)) effort.value = '';
+});
 
 const textBlocks = new Map<string, Item & { kind: 'assistant' }>();
 const toolItems = new Map<string, Item & { kind: 'tool' }>();
@@ -217,13 +261,63 @@ function scrollToBottom() {
 }
 
 function handle(message: ClaudeChatServerMessage) {
+  apply(message);
+  scrollToBottom();
+}
+
+function clearItems() {
+  items.value = [];
+  textBlocks.clear();
+  toolItems.clear();
+}
+
+/** Shows a stored conversation by replaying its messages. */
+function showConversation(message: ClaudeChatServerMessage & { type: 'history.current' }) {
+  clearItems();
+  currentConversationId.value = message.conversation?.id;
+  if (message.conversation) {
+    if (message.requestedModel !== undefined) model.value = message.requestedModel;
+    if (message.effort !== undefined) effort.value = message.effort;
+  }
+  for (const event of message.events) apply(event);
+  if (!busy.value) {
+    // Left over from a helper that stopped mid-turn; they can no longer finish.
+    for (const item of items.value) {
+      if (item.kind === 'permission' && !item.resolved) item.resolved = 'deny';
+      if (item.kind === 'tool' && item.state === 'running') item.state = 'error';
+    }
+  }
+}
+
+function requestModels(refresh = false) {
+  modelsRequested = true;
+  connection.send({ type: 'models.list', refresh });
+}
+
+function apply(message: ClaudeChatServerMessage) {
   switch (message.type) {
     case 'hello':
       daemonError.value = message.error;
       break;
     case 'auth.status':
       account.value = message.account;
-      if (message.account.loggedIn) login.active = false;
+      if (message.account.loggedIn) {
+        login.active = false;
+        if (!modelsRequested) requestModels();
+      } else {
+        modelsRequested = false;
+      }
+      break;
+    case 'models':
+      if (message.models.length) models.value = message.models;
+      modelsSource.value = message.source;
+      break;
+    case 'history.list':
+      conversations.value = message.conversations;
+      currentConversationId.value = message.currentId;
+      break;
+    case 'history.current':
+      showConversation(message);
       break;
     case 'auth.login.output':
       if (message.url) {
@@ -296,7 +390,6 @@ function handle(message: ClaudeChatServerMessage) {
     default:
       break;
   }
-  scrollToBottom();
 }
 
 function friendlyError(error: string) {
@@ -310,7 +403,11 @@ const connection = new ChatConnection(handle, (value, error) => {
   // Once a connection attempt has failed, keep the install hint up until the helper answers.
   if (value === 'disconnected') helperMissing.value = true;
   if (value === 'connected') helperMissing.value = false;
-  if (value !== 'connected') busy.value = false;
+  if (value !== 'connected') {
+    busy.value = false;
+    // A restarted helper may run a different Claude Code; ask again.
+    modelsRequested = false;
+  }
 });
 
 function render(text: string) {
@@ -328,7 +425,7 @@ function submit() {
   const text = draft.value.trim();
   if (!text || busy.value || !ready.value) return;
   draft.value = '';
-  connection.send({ type: 'chat.send', text, model: model.value || undefined });
+  connection.send({ type: 'chat.send', text, model: model.value || undefined, effort: effort.value || undefined });
 }
 
 function useExample(text: string) {
@@ -342,9 +439,18 @@ function interrupt() {
 
 function newChat() {
   connection.send({ type: 'chat.new' });
-  items.value = [];
-  textBlocks.clear();
-  toolItems.clear();
+  clearItems();
+  currentConversationId.value = undefined;
+  showHistory.value = false;
+}
+
+function openConversation(id: string) {
+  showHistory.value = false;
+  if (id !== currentConversationId.value) connection.send({ type: 'history.open', id });
+}
+
+function deleteConversation(id: string) {
+  connection.send({ type: 'history.delete', id });
 }
 
 function respond(item: Item & { kind: 'permission' }, allow: boolean, always = false) {
@@ -414,6 +520,16 @@ onUnmounted(() => connection.dispose());
 }
 html, body, #app { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); font: 13px/1.5 'Segoe UI', system-ui, sans-serif; }
+/* Shared by the chat, model picker and history panel. */
+textarea, input, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+select { padding: 2px 4px; }
+button { font: inherit; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: default; }
+button.ghost { background: transparent; color: var(--text); border-color: var(--border); padding: 3px 8px; }
+button.ghost.active { border-color: var(--accent); color: var(--accent); }
+button.danger { background: var(--error); border-color: var(--error); color: #fff; }
+button.ghost.danger { background: transparent; color: var(--error); border-color: var(--error); }
+a { color: var(--accent); }
 </style>
 
 <style scoped>
@@ -455,13 +571,5 @@ body { background: var(--bg); color: var(--text); font: 13px/1.5 'Segoe UI', sys
 .working { padding-left: 2px; }
 .composer { display: flex; gap: 6px; align-items: flex-end; padding: 8px 10px; border-top: 1px solid var(--border); }
 .composer textarea { flex: 1; resize: none; }
-textarea, input, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
-select { padding: 2px 4px; }
-button { font: inherit; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
-button:disabled { opacity: 0.5; cursor: default; }
-button.ghost { background: transparent; color: var(--text); border-color: var(--border); padding: 3px 8px; }
-button.danger { background: var(--error); border-color: var(--error); color: #fff; }
-button.ghost.danger { background: transparent; color: var(--error); border-color: var(--error); }
 .error { color: var(--error); }
-a { color: var(--accent); }
 </style>

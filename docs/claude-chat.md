@@ -42,6 +42,24 @@ EasyEDA dialog ──ws://127.0.0.1:8788──▶ chat helper ──stdin/stdout
 - The EasyEDA tools run without prompts (document changes are checkpoint-backed). Claude can also read the local MCP docs, search the web and fetch pages. Fetching a page asks for permission in the dialog.
 - Shell commands, file edits and file writes are disabled (`--restricted`), and Claude Code ignores your other MCP servers and settings files for this session.
 
+## Models and effort
+
+The model button in the header lists the models your account can use. The helper asks your Claude Code for the list (a stream-json `initialize` request, which does not call the API or use your limits) and keeps it for 30 minutes or until you sign in or out. **Refresh list** asks again.
+
+For each model the list shows its name, Claude Code's description, the full model ID, the context window, the output limit and the Anthropic API price per million input/output tokens. Pro and Max plans are not billed per token; the price shows how fast a model uses up your 5-hour and 7-day limits. **Show older versions** lists pinned models such as Opus 4.8 or Haiku 4.5. If Claude Code cannot be asked, the dialog shows the standard aliases (Default, Opus, Sonnet, Fable, Haiku).
+
+**Effort** (low to max, for models that support it) is passed as `claude --effort`. Higher effort thinks longer and uses more of your limits. Changing the model or effort restarts Claude Code for the next message; the conversation continues.
+
+Context windows and prices come from `shared/claude-models.ts`; update that table when Anthropic publishes new models.
+
+## History
+
+Every conversation is saved by the helper in `~/.easyeda-copilot/chat/history/<id>.json` (under `EASYEDA_COPILOT_CHAT_HOME` when set). It keeps the last 200 conversations and the last 1,500 messages, tool calls and results of each.
+
+**History** lists conversations by date, with search. Selecting one shows it again and continues it: the helper resumes the same Claude Code session (`claude --resume`), so Claude remembers the earlier messages, and the dialog restores the model and effort used. **✕** deletes a conversation after a second click. You cannot open another conversation while Claude is working; stop it first.
+
+If Claude Code no longer has the session (for example after its own transcripts were cleaned up), the dialog says so and your next message starts a new session in the same conversation.
+
 ## Security
 
 Any web page can try to open a WebSocket to `127.0.0.1`. The helper accepts a connection only when:

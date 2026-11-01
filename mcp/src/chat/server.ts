@@ -8,10 +8,12 @@ import {
     type ClaudeChatClientMessage,
     type ClaudeChatServerMessage,
 } from '@copilot/shared/types/claude-chat';
+import { BUILTIN_CLAUDE_MODELS, claudeModelsFromClaudeCode } from '@copilot/shared/claude-models';
 import type { Bridge } from '../bridge/index';
 import { DOCS_DIR, MCP_VERSION, SKILL_DOC_PATH, TEMP_DIR } from '../utils/dirs';
 import {
     claudeAuthStatus,
+    claudeInitialize,
     claudeLogout,
     claudeVersion,
     findClaude,
@@ -19,6 +21,9 @@ import {
     type ClaudeExecutable,
 } from './claude-cli';
 import { ClaudeChatSession, MCP_SERVER_NAME } from './session';
+import { ChatHistory, summarize } from './history';
+
+type ModelList = Extract<ClaudeChatServerMessage, { type: 'models' }>;
 
 export type ChatServerOptions = {
     host: string;
@@ -36,6 +41,8 @@ const EASYEDA_HOSTS = /(^|\.)(easyeda\.com|lceda\.cn|jlceda\.com|jlc\.com|jlcpcb
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const URL_PATTERN = /https?:\/\/[^\s"'<>]+/;
 const INSTANCE_POLL_MS = 5_000;
+/** The model list depends on the account and Claude Code version; ask again after this. */
+const MODEL_CACHE_MS = 30 * 60_000;
 
 /**
  * Browsers let any web page open a WebSocket to localhost, so only the EasyEDA
@@ -88,6 +95,9 @@ export class ChatServer {
 
     private workspace = '';
     private mcpConfigPath = '';
+    private history?: ChatHistory;
+    private models?: { list: ModelList; at: number };
+    private modelsLoading?: Promise<ModelList>;
 
     constructor(private readonly options: ChatServerOptions) {}
 
@@ -108,7 +118,7 @@ export class ChatServer {
             mcpConfigPath: this.mcpConfigPath,
             systemPrompt: systemPrompt(),
             addDirs: [DOCS_DIR, TEMP_DIR],
-            emit: message => this.broadcast(message),
+            emit: message => this.emit(message),
             log: this.options.log,
         });
         return claude;
@@ -132,6 +142,8 @@ export class ChatServer {
 
         this.workspace = workspace;
         this.mcpConfigPath = mcpConfigPath;
+        this.history = new ChatHistory(join(stateDir, 'history'), log);
+        this.history.prune().catch(() => undefined);
         await this.ensureClaude();
 
         const wss = new WebSocketServer({
@@ -165,6 +177,7 @@ export class ChatServer {
     async close() {
         clearInterval(this.instanceTimer);
         this.session?.dispose();
+        await this.history?.save().catch(() => undefined);
         this.login?.kill();
         for (const client of this.clients) client.close();
         await new Promise<void>(resolve => (this.wss ? this.wss.close(() => resolve()) : resolve()));
@@ -203,10 +216,12 @@ export class ChatServer {
                     claudeVersion: this.claudeVersionText,
                     error: this.claude ? undefined : 'Claude Code is not installed on this computer.',
                 });
+                if (this.session) this.send(socket, this.session.state());
+                this.send(socket, this.currentConversation());
                 if (this.session) {
-                    this.send(socket, this.session.state());
                     for (const prompt of this.session.pendingPermissions()) this.send(socket, prompt);
                 }
+                await this.sendHistoryList(socket);
                 this.lastInstances = '';
                 await this.pollInstances();
                 await this.sendAuthStatus(socket);
@@ -227,24 +242,116 @@ export class ChatServer {
                 if (!this.claude) return;
                 this.session?.reset();
                 await claudeLogout(this.claude);
+                this.models = undefined;
+                await this.startNewConversation();
                 await this.sendAuthStatus();
                 return;
             case 'chat.send':
                 if (!this.session) throw new Error('Claude Code is not installed on this computer.');
                 if (!message.text?.trim()) return;
-                this.session.send(message.text, message.model);
+                this.session.send(message.text, message.model, message.effort);
+                this.history?.noteRequest(message.model, message.effort);
                 return;
             case 'chat.interrupt':
                 this.session?.interrupt();
                 return;
             case 'chat.new':
                 this.session?.reset();
+                await this.startNewConversation();
                 return;
+            case 'models.list':
+                this.send(socket, await this.listModels(message.refresh === true));
+                return;
+            case 'history.list':
+                await this.sendHistoryList(socket);
+                return;
+            case 'history.open': {
+                if (!this.history) return;
+                if (this.session?.isBusy) throw new Error('Wait until Claude finishes, or stop it first.');
+                const conversation = await this.history.open(message.id);
+                this.session?.resume(conversation.sessionId);
+                this.broadcast(this.currentConversation());
+                await this.sendHistoryList();
+                return;
+            }
+            case 'history.delete': {
+                if (!this.history) return;
+                const isCurrent = this.history.current?.id === message.id;
+                if (isCurrent && this.session?.isBusy) throw new Error('Stop Claude before deleting this conversation.');
+                await this.history.remove(message.id);
+                if (isCurrent) {
+                    this.session?.reset();
+                    this.broadcast(this.currentConversation());
+                }
+                await this.sendHistoryList();
+                return;
+            }
             case 'permission.respond':
                 this.session?.respondPermission(message.requestId, message.allow === true, message.always === true);
                 return;
             default:
                 return;
+        }
+    }
+
+    private emit(message: ClaudeChatServerMessage) {
+        const started = this.history?.record(message) ?? false;
+        this.broadcast(message);
+        if (started || message.type === 'chat.result') this.sendHistoryList().catch(() => undefined);
+    }
+
+    private currentConversation(): ClaudeChatServerMessage {
+        const conversation = this.history?.current;
+        if (!conversation) return { type: 'history.current', events: [] };
+        return {
+            type: 'history.current',
+            conversation: summarize(conversation),
+            requestedModel: conversation.requestedModel ?? '',
+            effort: conversation.effort ?? '',
+            events: conversation.events,
+        };
+    }
+
+    private async startNewConversation() {
+        await this.history?.startNew();
+        this.broadcast(this.currentConversation());
+        await this.sendHistoryList();
+    }
+
+    private async sendHistoryList(socket?: WebSocket) {
+        if (!this.history) return;
+        const message: ClaudeChatServerMessage = {
+            type: 'history.list',
+            conversations: await this.history.list(),
+            currentId: this.history.current?.id,
+        };
+        if (socket) this.send(socket, message);
+        else this.broadcast(message);
+    }
+
+    /** Models this account can use, as listed by Claude Code; the built-in list if it cannot be asked. */
+    private listModels(refresh: boolean): Promise<ModelList> {
+        if (!refresh && this.models && Date.now() - this.models.at < MODEL_CACHE_MS) return Promise.resolve(this.models.list);
+        this.modelsLoading ??= this.loadModels().finally(() => { this.modelsLoading = undefined; });
+        return this.modelsLoading;
+    }
+
+    private async loadModels(): Promise<ModelList> {
+        const claude = await this.ensureClaude();
+        if (!claude) {
+            return { type: 'models', models: BUILTIN_CLAUDE_MODELS, source: 'builtin', error: 'Claude Code is not installed on this computer.' };
+        }
+        try {
+            const init = await claudeInitialize(claude, this.workspace);
+            const models = claudeModelsFromClaudeCode(init.models);
+            if (!models.length) throw new Error('Claude Code returned no models.');
+            const list: ModelList = { type: 'models', models, source: 'claude-code' };
+            this.models = { list, at: Date.now() };
+            return list;
+        } catch (error) {
+            const reason = (error as Error).message;
+            this.options.log(`Could not list Claude models: ${reason}`);
+            return { type: 'models', models: BUILTIN_CLAUDE_MODELS, source: 'builtin', error: reason };
         }
     }
 
@@ -277,6 +384,7 @@ export class ChatServer {
         });
         child.on('close', code => {
             if (this.login === child) this.login = undefined;
+            this.models = undefined;
             this.broadcast({ type: 'auth.login.done', ok: code === 0, error: code === 0 ? undefined : `Sign-in ended (code ${code}).` });
             this.sendAuthStatus().catch(() => undefined);
         });

@@ -11,6 +11,8 @@ const BUILT_IN_TOOLS = ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWr
 const AUTO_ALLOWED_TOOLS = [`mcp__${MCP_SERVER_NAME}`, 'Read', 'Glob', 'Grep', 'TodoWrite'];
 const INTERRUPT_GRACE_MS = 5_000;
 const PREVIEW_LIMIT = 600;
+const EFFORT_PATTERN = /^[a-z]+$/;
+export const SESSION_GONE_MESSAGE = 'Claude Code no longer has the saved session for this conversation, so Claude does not remember the earlier messages. Send your message again to continue in a new session.';
 
 export type SessionOptions = {
     claude: ClaudeExecutable;
@@ -73,6 +75,7 @@ export class ClaudeChatSession {
     private currentMessageId?: string;
     private stderrTail = '';
     private requestedModel?: string;
+    private requestedEffort?: string;
 
     constructor(private readonly options: SessionOptions) {}
 
@@ -89,11 +92,18 @@ export class ClaudeChatSession {
         }));
     }
 
-    send(text: string, model?: string) {
+    get isBusy() {
+        return this.busy;
+    }
+
+    send(text: string, model?: string, effort?: string) {
         if (this.busy) throw new Error('Claude is still working on the previous message.');
         const wantedModel = model?.trim() || undefined;
-        if (this.child && wantedModel !== this.requestedModel) this.stopProcess();
+        const wantedEffort = effort?.trim() || undefined;
+        if (wantedEffort && !EFFORT_PATTERN.test(wantedEffort)) throw new Error(`Unknown effort level: ${wantedEffort}`);
+        if (this.child && (wantedModel !== this.requestedModel || wantedEffort !== this.requestedEffort)) this.stopProcess();
         this.requestedModel = wantedModel;
+        this.requestedEffort = wantedEffort;
         const child = this.ensureProcess();
         this.setBusy(true);
         this.options.emit({ type: 'chat.user', text });
@@ -121,7 +131,19 @@ export class ClaudeChatSession {
 
     reset() {
         this.stopProcess();
-        this.sessionId = undefined;
+        this.switchTo(undefined);
+    }
+
+    /** Continues an earlier Claude Code session with the next message. */
+    resume(sessionId: string | undefined) {
+        if (this.busy) throw new Error('Wait until Claude finishes, or stop it first.');
+        this.stopProcess();
+        this.switchTo(sessionId);
+    }
+
+    private switchTo(sessionId: string | undefined) {
+        this.sessionId = sessionId;
+        this.model = undefined;
         this.alwaysAllowed.clear();
         this.streamedMessages.clear();
         this.options.emit(this.state());
@@ -158,6 +180,7 @@ export class ClaudeChatSession {
         ];
         for (const dir of this.options.addDirs) args.push('--add-dir', dir);
         if (this.requestedModel) args.push('--model', this.requestedModel);
+        if (this.requestedEffort) args.push('--effort', this.requestedEffort);
         if (this.sessionId) args.push('--resume', this.sessionId);
 
         this.options.log(`Starting Claude Code${this.sessionId ? ` (resume ${this.sessionId})` : ''}.`);
@@ -294,19 +317,31 @@ export class ClaudeChatSession {
             case 'rate_limit_event':
                 this.handleRateLimit(message.rate_limit_info);
                 return;
-            case 'result':
+            case 'result': {
                 clearTimeout(this.interruptTimer);
                 this.denyAllPending();
+                const errors = Array.isArray(message.errors) ? message.errors.map(String) : [];
+                const sessionGone = errors.some(text => /no conversation found/i.test(text));
                 this.options.emit({
                     type: 'chat.result',
                     isError: message.is_error === true,
-                    error: message.is_error ? String(message.result ?? message.subtype ?? 'Unknown error') : undefined,
+                    error: sessionGone
+                        ? SESSION_GONE_MESSAGE
+                        : message.is_error
+                            ? errors.join('\n') || String(message.result ?? message.subtype ?? 'Unknown error')
+                            : undefined,
                     durationMs: message.duration_ms,
                     costUsd: message.total_cost_usd,
                     numTurns: message.num_turns,
                 });
                 this.setBusy(false);
+                if (sessionGone) {
+                    // Start a new Claude Code session with the next message.
+                    this.sessionId = undefined;
+                    this.stopProcess();
+                }
                 return;
+            }
             default:
                 return;
         }

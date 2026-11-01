@@ -111,3 +111,59 @@ export async function claudeAuthStatus(claude: ClaudeExecutable): Promise<Claude
 export async function claudeLogout(claude: ClaudeExecutable) {
     await collect(spawnClaude(claude, ['auth', 'logout'], { stdio: ['ignore', 'pipe', 'pipe'] }), 20_000);
 }
+
+const MODEL_LIST_TIMEOUT_MS = 30_000;
+
+/**
+ * Asks Claude Code which models this account can use. It answers the stream-json
+ * `initialize` request without calling the API, so this costs no usage.
+ */
+export function claudeInitialize(claude: ClaudeExecutable, cwd: string): Promise<Record<string, unknown>> {
+    return new Promise((resolve, reject) => {
+        const child = spawnClaude(claude, [
+            '-p',
+            '--input-format', 'stream-json',
+            '--output-format', 'stream-json',
+            '--verbose',
+            '--strict-mcp-config',
+        ], { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+        const requestId = `models-${Date.now()}`;
+        let buffer = '';
+        let stderr = '';
+        let settled = false;
+        const finish = (error?: Error, value?: Record<string, unknown>) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            child.stdin?.end();
+            child.kill();
+            if (error) reject(error);
+            else resolve(value ?? {});
+        };
+        const timer = setTimeout(() => finish(new Error('Claude Code did not list its models in time.')), MODEL_LIST_TIMEOUT_MS);
+        child.stdout?.setEncoding('utf8');
+        child.stdout?.on('data', (chunk: string) => {
+            buffer += chunk;
+            let index: number;
+            while ((index = buffer.indexOf('\n')) >= 0) {
+                const line = buffer.slice(0, index).trim();
+                buffer = buffer.slice(index + 1);
+                if (!line) continue;
+                try {
+                    const message = JSON.parse(line);
+                    const response = message?.response;
+                    if (message?.type !== 'control_response' || response?.request_id !== requestId) continue;
+                    if (response.subtype === 'success') finish(undefined, response.response ?? {});
+                    else finish(new Error(String(response.error ?? 'Claude Code rejected the request.')));
+                } catch {
+                    // Not JSON; keep reading.
+                }
+            }
+        });
+        child.stderr?.on('data', chunk => { stderr = (stderr + chunk).slice(-1000); });
+        child.stdin?.on('error', () => undefined);
+        child.on('error', error => finish(error));
+        child.on('close', code => finish(new Error(stderr.trim() || `Claude Code exited (code ${code}).`)));
+        child.stdin?.write(`${JSON.stringify({ type: 'control_request', request_id: requestId, request: { subtype: 'initialize' } })}\n`);
+    });
+}

@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.3.3 - 2026-11-02
+
+### Claude Chat
+
+- Keep a history of conversations in the helper (`~/.easyeda-copilot/chat/history`, up to 200). **History** lists them by date with search and delete; opening one replays it and continues the same Claude Code session, with the model and effort it used. When Claude Code no longer has that session, the dialog says so and the next message starts a new one.
+- The model picker lists the models the signed-in account can use, as reported by Claude Code, with each model's ID, context window, output limit and Anthropic API price, plus older pinned versions. It falls back to the standard aliases when Claude Code cannot be asked. An effort selector passes `--effort` for models that support it.
 
 ### Schematic groups
 
