@@ -44,6 +44,19 @@ export type ClaudeChatConversationSummary = {
     messageCount: number;
 };
 
+export type ClaudeChatAttachmentKind = 'image' | 'pdf' | 'text';
+
+/** A file attached to a message, as the dialog sees it (the file itself stays with the helper). */
+export type ClaudeChatAttachment = {
+    id: string;
+    name: string;
+    mediaType: string;
+    size: number;
+    kind: ClaudeChatAttachmentKind;
+    /** Small data: URL preview of an image. */
+    thumbnail?: string;
+};
+
 export type ClaudeChatUsage = {
     fiveHour?: number;
     sevenDay?: number;
@@ -59,7 +72,18 @@ export type ClaudeChatClientMessage =
     | { type: 'auth.login.input'; text: string }
     | { type: 'auth.login.cancel' }
     | { type: 'auth.logout' }
-    | { type: 'chat.send'; text: string; model?: string; effort?: string }
+    /** attachments: ids from `attachment.ready`. */
+    | { type: 'chat.send'; text: string; model?: string; effort?: string; attachments?: string[] }
+    /**
+     * Upload in order: begin, then chunks of base64 data, each sent after the previous
+     * one is acknowledged, then end. uploadId is chosen by the dialog.
+     */
+    | { type: 'attachment.begin'; uploadId: string; name: string; mediaType: string; size: number; thumbnail?: string }
+    | { type: 'attachment.chunk'; uploadId: string; index: number; data: string }
+    | { type: 'attachment.end'; uploadId: string }
+    | { type: 'attachment.cancel'; uploadId: string }
+    /** Drops an uploaded file that the user removed before sending. */
+    | { type: 'attachment.discard'; id: string }
     | { type: 'chat.interrupt' }
     | { type: 'chat.new' }
     | { type: 'models.list'; refresh?: boolean }
@@ -83,7 +107,11 @@ export type ClaudeChatServerMessage =
     | { type: 'auth.login.output'; text: string; url?: string }
     | { type: 'auth.login.done'; ok: boolean; error?: string }
     | { type: 'chat.state'; busy: boolean; sessionId?: string; model?: string; mcpStatus?: string }
-    | { type: 'chat.user'; text: string }
+    | { type: 'chat.user'; text: string; attachments?: ClaudeChatAttachment[] }
+    /** Replies to the uploading dialog only. received counts bytes stored so far. */
+    | { type: 'attachment.ack'; uploadId: string; index: number; received: number }
+    | { type: 'attachment.ready'; uploadId: string; attachment: ClaudeChatAttachment }
+    | { type: 'attachment.error'; uploadId: string; message: string }
     | { type: 'chat.text.start'; id: string }
     | { type: 'chat.text.delta'; id: string; text: string }
     | { type: 'chat.tool'; id: string; name: string; summary: string }

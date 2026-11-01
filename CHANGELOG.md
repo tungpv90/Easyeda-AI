@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.4 - 2026-11-02
+
+### Claude Chat
+
+- Attach images (PNG, JPEG, GIF, WebP), PDFs and text files (netlists, SPICE, CSV, source code, …) to a message with **📎**, paste or drag and drop; up to 10 files per message. Large photos and screenshots are shrunk to Claude's 5 MB image limit in the dialog. Files go to the helper in acknowledged 192 KB chunks with progress, are checked against their declared type and saved under the chat workspace. Claude receives images and PDFs as content blocks and text files inline; a PDF over 10 MB, a text file over 200 KB or anything beyond 20 MB per message is listed by path for Claude's Read tool. Sent messages show thumbnails and file names, also in the history, and deleting a conversation deletes its files.
+
 ## 1.3.3 - 2026-11-02
 
 ### Claude Chat

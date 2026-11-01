@@ -52,6 +52,22 @@ For each model the list shows its name, Claude Code's description, the full mode
 
 Context windows and prices come from `shared/claude-models.ts`; update that table when Anthropic publishes new models.
 
+## Attachments
+
+Attach images, PDFs and text files to a message with **📎**, by pasting (for example a screenshot) or by dropping files on the dialog. Up to 10 files per message:
+
+| Type | Formats | Limit |
+| --- | --- | --- |
+| Image | PNG, JPEG, GIF, WebP | 5 MB; larger photos and screenshots are shrunk to fit (at most 2576 px on the long side) |
+| PDF | datasheets, application notes, drawings | 32 MB |
+| Text | `.txt`, `.md`, `.csv`, `.json`, `.xml`, netlists and SPICE files (`.net`, `.cir`, `.sp`, `.lib`), source code, … | 2 MB, UTF-8 |
+
+The dialog sends each file to the helper in 192 KB pieces and shows the progress. The helper checks that the content matches the type and saves it in `~/.easyeda-copilot/chat/workspace/attachments/`. Claude receives images and PDFs directly, and text files as text. A PDF over 10 MB, a text file over 200 KB, or files beyond 20 MB in one message are not sent inline. Claude gets their local path instead and opens them with its Read tool, which also works for long datasheets. Every message lists its files with their paths, so Claude can open them again later in the conversation.
+
+Attached files are part of the conversation: they show in the history, and deleting a conversation deletes its files. Uploaded files that are never sent are deleted after 6 hours.
+
+Large PDFs use a lot of context and therefore your usage limits. Attach the relevant datasheet pages when you can.
+
 ## History
 
 Every conversation is saved by the helper in `~/.easyeda-copilot/chat/history/<id>.json` (under `EASYEDA_COPILOT_CHAT_HOME` when set). It keeps the last 200 conversations and the last 1,500 messages, tool calls and results of each.

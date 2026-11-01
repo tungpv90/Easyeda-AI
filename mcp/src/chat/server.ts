@@ -22,6 +22,7 @@ import {
 } from './claude-cli';
 import { ClaudeChatSession, MCP_SERVER_NAME } from './session';
 import { ChatHistory, summarize } from './history';
+import { AttachmentStore, publicAttachment, userMessageContent } from './attachments';
 
 type ModelList = Extract<ClaudeChatServerMessage, { type: 'models' }>;
 
@@ -76,6 +77,7 @@ function systemPrompt() {
         `Work on the user's open EasyEDA project through the ${MCP_SERVER_NAME} MCP tools.`,
         `Before your first design action, read the local skill guide at ${SKILL_DOC_PATH} and follow it.`,
         'You cannot run shell commands or write local files in this dialog.',
+        'The user can attach images, PDFs such as datasheets, and text files. Each message lists its attachments with a local path; open a file with Read when it was too large to include or when you need it again later.',
         'Save a checkpoint before large edits so the user can undo them.',
         'Reply in the language the user writes in. Keep replies short and concrete.',
     ].join(' ');
@@ -96,6 +98,7 @@ export class ChatServer {
     private workspace = '';
     private mcpConfigPath = '';
     private history?: ChatHistory;
+    private attachments?: AttachmentStore;
     private models?: { list: ModelList; at: number };
     private modelsLoading?: Promise<ModelList>;
 
@@ -142,7 +145,10 @@ export class ChatServer {
 
         this.workspace = workspace;
         this.mcpConfigPath = mcpConfigPath;
-        this.history = new ChatHistory(join(stateDir, 'history'), log);
+        // Inside Claude's working folder, so Claude Code can also open the files with Read.
+        const attachments = new AttachmentStore(join(workspace, 'attachments'));
+        this.attachments = attachments;
+        this.history = new ChatHistory(join(stateDir, 'history'), log, ids => attachments.removeFiles(ids));
         this.history.prune().catch(() => undefined);
         await this.ensureClaude();
 
@@ -246,11 +252,46 @@ export class ChatServer {
                 await this.startNewConversation();
                 await this.sendAuthStatus();
                 return;
-            case 'chat.send':
+            case 'chat.send': {
                 if (!this.session) throw new Error('Claude Code is not installed on this computer.');
-                if (!message.text?.trim()) return;
-                this.session.send(message.text, message.model, message.effort);
+                if (this.session.isBusy) throw new Error('Claude is still working on the previous message.');
+                const text = typeof message.text === 'string' ? message.text : '';
+                const attachments = this.attachments?.take(message.attachments) ?? [];
+                if (!text.trim() && !attachments.length) return;
+                try {
+                    const content = attachments.length ? await userMessageContent(text, attachments) : undefined;
+                    this.session.send(text, message.model, message.effort, { content, attachments: attachments.map(publicAttachment) });
+                } catch (error) {
+                    // Keep the files so the user can try again.
+                    this.attachments?.restore(attachments);
+                    throw error;
+                }
                 this.history?.noteRequest(message.model, message.effort);
+                return;
+            }
+            case 'attachment.begin':
+                await this.onUpload(socket, message.uploadId, async store => {
+                    store.begin(message);
+                    this.send(socket, { type: 'attachment.ack', uploadId: message.uploadId, index: -1, received: 0 });
+                });
+                return;
+            case 'attachment.chunk':
+                await this.onUpload(socket, message.uploadId, async store => {
+                    const received = store.chunk(message.uploadId, message.index, message.data);
+                    this.send(socket, { type: 'attachment.ack', uploadId: message.uploadId, index: message.index, received });
+                });
+                return;
+            case 'attachment.end':
+                await this.onUpload(socket, message.uploadId, async store => {
+                    const attachment = await store.end(message.uploadId);
+                    this.send(socket, { type: 'attachment.ready', uploadId: message.uploadId, attachment: publicAttachment(attachment) });
+                });
+                return;
+            case 'attachment.cancel':
+                this.attachments?.cancel(message.uploadId);
+                return;
+            case 'attachment.discard':
+                await this.attachments?.discard(message.id);
                 return;
             case 'chat.interrupt':
                 this.session?.interrupt();
@@ -291,6 +332,18 @@ export class ChatServer {
                 return;
             default:
                 return;
+        }
+    }
+
+    /** Runs one upload step; a failure cancels the upload and is reported to that dialog only. */
+    private async onUpload(socket: WebSocket, uploadId: string, step: (store: AttachmentStore) => Promise<void>) {
+        const store = this.attachments;
+        if (!store) return;
+        try {
+            await step(store);
+        } catch (error) {
+            store.cancel(uploadId);
+            this.send(socket, { type: 'attachment.error', uploadId: String(uploadId), message: (error as Error).message });
         }
     }
 

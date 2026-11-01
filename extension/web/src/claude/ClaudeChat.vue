@@ -1,5 +1,5 @@
 <template>
-  <div class="claude-chat">
+  <div class="claude-chat" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
     <header class="bar">
       <div class="title">
         <span class="dot" :class="connectionClass" :title="connectionLabel"></span>
@@ -94,7 +94,15 @@
           <button v-for="example in examples" :key="example" class="example" @click="useExample(example)">{{ example }}</button>
         </div>
         <template v-for="item in items" :key="item.key">
-          <div v-if="item.kind === 'user'" class="msg user">{{ item.text }}</div>
+          <div v-if="item.kind === 'user'" class="msg user">
+            <div v-if="item.attachments?.length" class="sent-files">
+              <template v-for="file in item.attachments" :key="file.id">
+                <img v-if="file.thumbnail" class="sent-thumb" :src="file.thumbnail" :alt="file.name" :title="`${file.name} · ${formatBytes(file.size)}`" />
+                <span v-else class="sent-file" :title="formatBytes(file.size)">{{ kindIcon(file.kind) }} {{ file.name }}</span>
+              </template>
+            </div>
+            <div v-if="item.text">{{ item.text }}</div>
+          </div>
           <div v-else-if="item.kind === 'assistant' && item.text" class="msg assistant markdown" v-html="render(item.text)"></div>
           <details v-else-if="item.kind === 'tool'" class="tool" :class="item.state">
             <summary>
@@ -121,16 +129,42 @@
       </main>
 
       <footer class="composer">
-        <textarea
-          ref="inputEl"
-          v-model="draft"
-          rows="3"
-          placeholder="Message Claude (Enter to send, Shift+Enter for a new line)"
-          @keydown.enter.exact.prevent="submit"
-        ></textarea>
-        <button v-if="busy" class="danger" @click="interrupt">Stop</button>
-        <button v-else :disabled="!draft.trim()" @click="submit">Send</button>
+        <div v-if="pending.length" class="pending">
+          <div v-for="file in pending" :key="file.key" class="chip" :class="file.status" :title="file.error ?? file.name">
+            <img v-if="file.thumbnail" class="chip-thumb" :src="file.thumbnail" alt="" />
+            <span v-else class="chip-icon">{{ kindIcon(file.kind) }}</span>
+            <span class="chip-text">
+              <span class="chip-name">{{ file.name }}</span>
+              <span class="chip-meta">
+                <template v-if="file.status === 'error'">{{ file.error }}</template>
+                <template v-else-if="file.status === 'ready'">{{ formatBytes(file.size) }}</template>
+                <template v-else-if="file.status === 'uploading'">Uploading {{ Math.round(file.progress * 100) }}%</template>
+                <template v-else>Preparing…</template>
+              </span>
+            </span>
+            <button class="chip-remove" title="Remove" @click="removePending(file)">✕</button>
+          </div>
+        </div>
+        <div class="composer-row">
+          <button
+            class="ghost attach"
+            :disabled="pending.length >= ATTACHMENT_LIMITS.maxFiles"
+            title="Attach images, PDFs or text files (you can also paste or drop them)"
+            @click="attachFiles"
+          >📎</button>
+          <textarea
+            ref="inputEl"
+            v-model="draft"
+            rows="3"
+            placeholder="Message Claude (Enter to send, Shift+Enter for a new line). Paste or drop images, PDFs and text files."
+            @keydown.enter.exact.prevent="submit"
+            @paste="onPaste"
+          ></textarea>
+          <button v-if="busy" class="danger" @click="interrupt">Stop</button>
+          <button v-else :disabled="!canSend" :title="sendTitle" @click="submit">Send</button>
+        </div>
       </footer>
+      <div v-if="dragging" class="drop-overlay">Drop images, PDFs or text files to attach them</div>
     </template>
   </div>
 </template>
@@ -140,19 +174,22 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import DOMPurify from 'dompurify';
 import type {
   ClaudeChatAccount,
+  ClaudeChatAttachment,
   ClaudeChatConversationSummary,
   ClaudeChatModel,
   ClaudeChatServerMessage,
   ClaudeChatUsage,
 } from '@copilot/shared/types/claude-chat';
 import { BUILTIN_CLAUDE_MODELS } from '@copilot/shared/claude-models';
+import { ATTACHMENT_LIMITS, formatBytes } from '@copilot/shared/claude-attachments';
+import { AttachmentUploader, newUploadId, pickFiles, prepareFile, type PendingAttachment } from './attachments';
 import { markdown } from '../utils/markdown';
 import { ChatConnection, openExternal, type ConnectionStatus } from './connection';
 import HistoryPanel from './HistoryPanel.vue';
 import ModelPicker from './ModelPicker.vue';
 
 type Item =
-  | { kind: 'user'; key: string; text: string }
+  | { kind: 'user'; key: string; text: string; attachments?: ClaudeChatAttachment[] }
   | { kind: 'assistant'; key: string; text: string }
   | { kind: 'tool'; key: string; name: string; summary: string; state: 'running' | 'ok' | 'error'; preview?: string }
   | { kind: 'permission'; key: string; requestId: string; toolName: string; summary: string; description?: string; resolved?: 'allow' | 'deny' }
@@ -187,6 +224,8 @@ const showHistory = ref(false);
 const draft = ref('');
 const helperMissing = ref(false);
 const items = ref<Item[]>([]);
+const pending = ref<PendingAttachment[]>([]);
+const dragging = ref(false);
 const scroller = ref<HTMLElement>();
 const inputEl = ref<HTMLTextAreaElement>();
 const login = reactive({ active: false, url: '', code: '', error: '' });
@@ -261,6 +300,7 @@ function scrollToBottom() {
 }
 
 function handle(message: ClaudeChatServerMessage) {
+  if (uploader.handle(message)) return;
   apply(message);
   scrollToBottom();
 }
@@ -334,7 +374,7 @@ function apply(message: ClaudeChatServerMessage) {
       busy.value = message.busy;
       break;
     case 'chat.user':
-      push({ kind: 'user', key: nextKey(), text: message.text });
+      push({ kind: 'user', key: nextKey(), text: message.text, attachments: message.attachments });
       break;
     case 'chat.text.start': {
       const item = push({ kind: 'assistant', key: nextKey(), text: '' }) as Item & { kind: 'assistant' };
@@ -407,8 +447,89 @@ const connection = new ChatConnection(handle, (value, error) => {
     busy.value = false;
     // A restarted helper may run a different Claude Code; ask again.
     modelsRequested = false;
+    uploader.failAll('The connection to the helper was lost. Remove the file and attach it again.');
   }
 });
+const uploader = new AttachmentUploader(message => connection.send(message));
+
+const uploadingCount = computed(() => pending.value.filter(file => file.status === 'preparing' || file.status === 'uploading').length);
+const readyFiles = computed(() => pending.value.filter(file => file.status === 'ready' && file.id));
+const canSend = computed(() => ready.value && !busy.value && !uploadingCount.value
+  && (draft.value.trim().length > 0 || readyFiles.value.length > 0));
+const sendTitle = computed(() => (uploadingCount.value ? 'Wait until the files are uploaded' : 'Send (Enter)'));
+
+function kindIcon(kind?: string) {
+  return kind === 'image' ? '🖼' : kind === 'pdf' ? '📄' : '📝';
+}
+
+async function addFiles(files: File[]) {
+  for (const file of files) {
+    if (pending.value.length >= ATTACHMENT_LIMITS.maxFiles) {
+      pending.value.push({
+        key: nextKey(), uploadId: '', name: file.name || 'file', size: file.size, status: 'error', progress: 0,
+        error: `At most ${ATTACHMENT_LIMITS.maxFiles} files per message.`,
+      });
+      break;
+    }
+    pending.value.push({ key: nextKey(), uploadId: newUploadId(), name: file.name || 'pasted-image.png', size: file.size, status: 'preparing', progress: 0 });
+    const entry = pending.value[pending.value.length - 1];
+    uploadOne(entry, file);
+  }
+}
+
+async function uploadOne(entry: PendingAttachment, file: File) {
+  try {
+    const prepared = await prepareFile(file);
+    Object.assign(entry, { name: prepared.name, kind: prepared.kind, size: prepared.data.size, thumbnail: prepared.thumbnail, status: 'uploading' });
+    const attachment = await uploader.upload(entry.uploadId, prepared, fraction => { entry.progress = fraction; });
+    if (!pending.value.includes(entry)) {
+      // Removed while uploading.
+      connection.send({ type: 'attachment.discard', id: attachment.id });
+      return;
+    }
+    Object.assign(entry, { id: attachment.id, name: attachment.name, size: attachment.size, status: 'ready', progress: 1 });
+  } catch (error) {
+    Object.assign(entry, { status: 'error', error: (error as Error).message });
+  }
+}
+
+function removePending(entry: PendingAttachment) {
+  pending.value = pending.value.filter(file => file !== entry);
+  if (entry.status === 'ready' && entry.id) connection.send({ type: 'attachment.discard', id: entry.id });
+  else if (entry.uploadId) uploader.cancel(entry.uploadId);
+}
+
+async function attachFiles() {
+  addFiles(await pickFiles());
+}
+
+function onPaste(event: ClipboardEvent) {
+  const files = [...(event.clipboardData?.files ?? [])];
+  if (!files.length) return;
+  event.preventDefault();
+  addFiles(files);
+}
+
+function hasFiles(event: DragEvent) {
+  return [...(event.dataTransfer?.types ?? [])].includes('Files');
+}
+
+function onDragOver(event: DragEvent) {
+  if (!ready.value || showHistory.value || !hasFiles(event)) return;
+  event.preventDefault();
+  dragging.value = true;
+}
+
+function onDragLeave(event: DragEvent) {
+  if (event.relatedTarget === null || !(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) dragging.value = false;
+}
+
+function onDrop(event: DragEvent) {
+  if (!dragging.value) return;
+  event.preventDefault();
+  dragging.value = false;
+  addFiles([...(event.dataTransfer?.files ?? [])]);
+}
 
 function render(text: string) {
   return DOMPurify.sanitize(markdown(text));
@@ -422,10 +543,18 @@ function onMessagesClick(event: MouseEvent) {
 }
 
 function submit() {
+  if (!canSend.value) return;
   const text = draft.value.trim();
-  if (!text || busy.value || !ready.value) return;
+  const attachments = readyFiles.value.map(file => file.id!);
   draft.value = '';
-  connection.send({ type: 'chat.send', text, model: model.value || undefined, effort: effort.value || undefined });
+  pending.value = [];
+  connection.send({
+    type: 'chat.send',
+    text,
+    model: model.value || undefined,
+    effort: effort.value || undefined,
+    attachments: attachments.length ? attachments : undefined,
+  });
 }
 
 function useExample(text: string) {
@@ -569,7 +698,27 @@ a { color: var(--accent); }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .permission { border: 1px solid var(--accent); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
 .working { padding-left: 2px; }
-.composer { display: flex; gap: 6px; align-items: flex-end; padding: 8px 10px; border-top: 1px solid var(--border); }
-.composer textarea { flex: 1; resize: none; }
+.composer { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
+.composer-row { display: flex; gap: 6px; align-items: flex-end; }
+.composer textarea { flex: 1; resize: none; min-width: 0; }
+.attach { font-size: 15px; padding: 3px 7px; }
+.pending { display: flex; flex-wrap: wrap; gap: 6px; max-height: 120px; overflow-y: auto; }
+.chip { display: flex; align-items: center; gap: 6px; max-width: 210px; padding: 3px 4px 3px 3px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); font-size: 12px; }
+.chip.error { border-color: var(--error); }
+.chip.error .chip-meta { color: var(--error); }
+.chip-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.chip-icon { width: 32px; text-align: center; font-size: 18px; flex-shrink: 0; }
+.chip-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.chip-name, .chip-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-meta { color: var(--muted); font-size: 11px; }
+.chip-remove { background: transparent; border: none; color: var(--muted); padding: 0 4px; flex-shrink: 0; }
+.sent-files { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; white-space: normal; }
+.sent-thumb { max-width: 120px; max-height: 90px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); }
+.sent-file { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); }
+.drop-overlay {
+  position: fixed; inset: 8px; z-index: 30; display: flex; align-items: center; justify-content: center; text-align: center;
+  border: 2px dashed var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--bg) 85%, transparent);
+  color: var(--accent); font-weight: 600; pointer-events: none; padding: 16px;
+}
 .error { color: var(--error); }
 </style>

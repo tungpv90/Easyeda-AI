@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import type { ClaudeChatServerMessage, ClaudeChatUsage } from '@copilot/shared/types/claude-chat';
+import type { ClaudeChatAttachment, ClaudeChatServerMessage, ClaudeChatUsage } from '@copilot/shared/types/claude-chat';
 import { spawnClaude, type ClaudeExecutable } from './claude-cli';
 
 export const MCP_SERVER_NAME = 'easyeda-copilot';
@@ -96,7 +96,11 @@ export class ClaudeChatSession {
         return this.busy;
     }
 
-    send(text: string, model?: string, effort?: string) {
+    /**
+     * extra.content replaces the plain text block, e.g. with attached images and
+     * documents; extra.attachments is what the dialog shows with the message.
+     */
+    send(text: string, model?: string, effort?: string, extra: { content?: unknown[]; attachments?: ClaudeChatAttachment[] } = {}) {
         if (this.busy) throw new Error('Claude is still working on the previous message.');
         const wantedModel = model?.trim() || undefined;
         const wantedEffort = effort?.trim() || undefined;
@@ -106,10 +110,12 @@ export class ClaudeChatSession {
         this.requestedEffort = wantedEffort;
         const child = this.ensureProcess();
         this.setBusy(true);
-        this.options.emit({ type: 'chat.user', text });
+        this.options.emit(extra.attachments?.length
+            ? { type: 'chat.user', text, attachments: extra.attachments }
+            : { type: 'chat.user', text });
         this.write(child, {
             type: 'user',
-            message: { role: 'user', content: [{ type: 'text', text }] },
+            message: { role: 'user', content: extra.content ?? [{ type: 'text', text }] },
             parent_tool_use_id: null,
         });
     }

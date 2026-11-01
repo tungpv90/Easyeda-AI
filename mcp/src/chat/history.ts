@@ -60,6 +60,11 @@ export function summarize(conversation: StoredConversation): ClaudeChatConversat
     };
 }
 
+/** Ids of the files attached anywhere in a conversation. */
+export function attachmentIds(conversation: StoredConversation) {
+    return conversation.events.flatMap(event => (event.type === 'chat.user' ? event.attachments ?? [] : []).map(file => file.id));
+}
+
 function parse(text: string): StoredConversation | undefined {
     try {
         const value = JSON.parse(text) as StoredConversation;
@@ -81,7 +86,12 @@ export class ChatHistory {
     /** Summaries of saved conversations, read from disk once. */
     private summaries?: Map<string, ClaudeChatConversationSummary>;
 
-    constructor(private readonly dir: string, private readonly log: (line: string) => void = () => undefined) {}
+    constructor(
+        private readonly dir: string,
+        private readonly log: (line: string) => void = () => undefined,
+        /** Deletes the saved files of a removed conversation's attachments. */
+        private readonly removeAttachments: (ids: string[]) => Promise<void> = async () => undefined,
+    ) {}
 
     /** Adds one dialog message to the current conversation. Returns true when a new conversation started. */
     record(message: ClaudeChatServerMessage): boolean {
@@ -99,7 +109,8 @@ export class ChatHistory {
         if (!this.current) {
             if (message.type !== 'chat.user') return false;
             const now = Date.now();
-            this.current = { version: 1, id: randomUUID(), title: titleFrom(message.text), createdAt: now, updatedAt: now, events: [] };
+            const title = titleFrom(message.text || message.attachments?.map(file => file.name).join(', ') || '');
+            this.current = { version: 1, id: randomUUID(), title, createdAt: now, updatedAt: now, events: [] };
             created = true;
         }
 
@@ -151,6 +162,7 @@ export class ChatHistory {
 
     async remove(id: string) {
         if (!isConversationId(id)) return;
+        const conversation = await this.load(id);
         if (this.current?.id === id) {
             clearTimeout(this.saveTimer);
             this.saveTimer = undefined;
@@ -158,6 +170,7 @@ export class ChatHistory {
         }
         await rm(this.file(id), { force: true });
         this.summaries?.delete(id);
+        if (conversation) await this.removeAttachments(attachmentIds(conversation));
     }
 
     /** Newest first; includes the current conversation even before it is saved. */
@@ -192,6 +205,7 @@ export class ChatHistory {
             if (conversation.id === this.current?.id) continue;
             await rm(this.file(conversation.id), { force: true });
             this.summaries?.delete(conversation.id);
+            await this.removeAttachments(attachmentIds(conversation));
         }
     }
 

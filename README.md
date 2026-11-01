@@ -27,7 +27,7 @@ Easyeda-AI is a fork of [EasyEDA Copilot](https://github.com/biosshot/easyeda-co
 You need EasyEDA Pro Desktop and a Claude account (Pro or Max subscription, or an Anthropic Console account). You do not need Node.js or a terminal.
 
 1. Download both files from the [latest release](https://github.com/tungpv90/Easyeda-AI/releases/latest):
-   - [`easyeda-copilot_v1.3.3.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.3.eext): the EasyEDA extension
+   - [`easyeda-copilot_v1.3.4.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.4.eext): the EasyEDA extension
    - [`ClaudeChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe): the local helper installer
 2. In EasyEDA Pro, open `Settings → Extensions → Extensions Manager → Import Extensions`, choose the `.eext` file, and enable **External Interactions**.
 
@@ -53,6 +53,7 @@ Windows may show "Windows protected your PC" the first time, because the install
 - Shows your 5-hour and 7-day subscription usage, and lets you stop a reply or start a new conversation.
 - Lists the models your Claude account can use (Opus, Sonnet, Fable, Haiku and older versions), with each model's ID, context window, output limit and API price, and lets you choose the effort level.
 - Keeps a history of your conversations. Open an earlier one to continue it: Claude remembers what was said.
+- Attach images, PDFs (for example datasheets) and text files such as netlists with 📎, by pasting a screenshot, or by dropping files on the dialog.
 - Cannot run shell commands or edit files on your computer.
 
 ### Why a separate installer
@@ -215,7 +216,7 @@ Requires Node.js ^20.19.0 or >= 22.12.0.
 git clone https://github.com/tungpv90/Easyeda-AI.git
 cd Easyeda-AI
 npm ci
-npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.3.eext
+npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.4.eext
 npm run build:installer    # helper     -> build/dist/ClaudeChatSetup.exe (Windows)
 npm run check --workspace=mcp
 ```
