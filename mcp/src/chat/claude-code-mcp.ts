@@ -1,9 +1,19 @@
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { claudeMcpAdd, claudeMcpRemove, findClaude } from './claude-cli';
-import { MCP_SERVER_NAME } from './session';
 
+/** Name of the entry in the user's Claude Code; differs from upstream's "easyeda-copilot" so neither replaces the other. */
+export const CLAUDE_CODE_MCP_NAME = 'easyeda-ai-assistant';
 const MARKER_FILE = 'claude-code-mcp.json';
+
+async function readMarker(stateDir: string): Promise<string | undefined> {
+    try {
+        const name = JSON.parse(await readFile(join(stateDir, MARKER_FILE), 'utf8')).name;
+        return typeof name === 'string' ? name : undefined;
+    } catch {
+        return undefined;
+    }
+}
 
 /**
  * The command Claude Code runs for the MCP server. From an npx cache we go through
@@ -26,22 +36,20 @@ export async function registerClaudeCodeMcp(entry: string, stateDir: string) {
     const claude = findClaude();
     if (!claude) return undefined;
     const command = mcpServerCommand(entry);
-    await claudeMcpAdd(claude, MCP_SERVER_NAME, command);
+    // An earlier install may have used another name; only an entry we added is removed.
+    const previous = await readMarker(stateDir);
+    if (previous && previous !== CLAUDE_CODE_MCP_NAME) await claudeMcpRemove(claude, previous);
+    await claudeMcpAdd(claude, CLAUDE_CODE_MCP_NAME, command);
     // Remembers that this entry is ours, so uninstalling does not remove one the user added.
-    await writeFile(join(stateDir, MARKER_FILE), JSON.stringify({ name: MCP_SERVER_NAME, command }, null, 2));
+    await writeFile(join(stateDir, MARKER_FILE), JSON.stringify({ name: CLAUDE_CODE_MCP_NAME, command }, null, 2));
     return command;
 }
 
 /** Removes the entry added by registerClaudeCodeMcp. Returns whether one was removed. */
 export async function unregisterClaudeCodeMcp(stateDir: string) {
-    const marker = join(stateDir, MARKER_FILE);
-    let name: string;
-    try {
-        name = JSON.parse(await readFile(marker, 'utf8')).name;
-    } catch {
-        return false;
-    }
-    await rm(marker, { force: true });
+    const name = await readMarker(stateDir);
+    if (!name) return false;
+    await rm(join(stateDir, MARKER_FILE), { force: true });
     const claude = findClaude();
-    return claude && typeof name === 'string' ? claudeMcpRemove(claude, name) : false;
+    return claude ? claudeMcpRemove(claude, name) : false;
 }

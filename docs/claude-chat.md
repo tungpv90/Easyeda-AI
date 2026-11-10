@@ -1,29 +1,29 @@
 # Claude Chat dialog
 
-`Copilot → Claude Chat` opens a chat window inside EasyEDA Pro. Claude works on the open project through the same EasyEDA Copilot MCP tools that Claude Code uses, so you do not need a terminal session.
+`AI Assistant → Claude Chat` opens a chat window inside EasyEDA Pro. Claude works on the open project through the same EasyEDA Copilot MCP tools that Claude Code uses, so you do not need a terminal session.
 
 The dialog uses **your own Claude Code installation and sign-in** (Claude Pro or Max subscription, or a Console account). It never reads or stores Claude credentials.
 
 ## Setup (Windows)
 
 1. Import the `.eext` in EasyEDA Pro (`Settings → Extensions → Extensions Manager → Import Extensions`) and enable **External Interactions**.
-2. Double-click `ClaudeChatSetup.exe` once. It needs no Node.js. It:
+2. Double-click `AIChatSetup.exe` once. It needs no Node.js. It:
    - installs Claude Code with Anthropic's official installer if it is missing;
    - copies the helper to `%LOCALAPPDATA%\EasyEDA Copilot\Claude Chat`;
    - starts the helper now and at every Windows login (Startup folder);
-   - adds the `easyeda-copilot` MCP server to your Claude Code (see [Claude Code in a terminal or VS Code](#claude-code-in-a-terminal-or-vs-code)).
-3. Open `Copilot → Claude Chat`. If Claude Code is not signed in yet, select **Sign in with Claude**; a browser window opens for the claude.ai sign-in.
+   - adds the `easyeda-ai-assistant` MCP server to your Claude Code (see [Claude Code in a terminal or VS Code](#claude-code-in-a-terminal-or-vs-code)).
+3. Open `AI Assistant → Claude Chat`. If Claude Code is not signed in yet, select **Sign in with Claude**; a browser window opens for the claude.ai sign-in.
 
-If you open the dialog before step 2, it shows a **Download ClaudeChatSetup.exe** button and connects by itself once the helper runs.
+If you open the dialog before step 2, it shows a **Download AIChatSetup.exe** button and connects by itself once the helper runs.
 
-Running `ClaudeChatSetup.exe` again updates the helper. `ClaudeChatSetup.exe --uninstall` removes it. When the helper and the extension are different versions, the dialog says which one to update.
+Running `AIChatSetup.exe` again updates the helper. `AIChatSetup.exe --uninstall` removes it. When the helper and the extension are different versions, the dialog says which one to update.
 
 Why a separate installer: EasyEDA extensions run in a sandbox and cannot start programs, so the helper that runs Claude Code has to be installed outside EasyEDA.
 
 ### Building the installer
 
 ```sh
-npm run build:installer   # -> build/dist/ClaudeChatSetup.exe
+npm run build:installer   # -> build/dist/AIChatSetup.exe
 ```
 
 The installer is a Node.js single executable application ([installer/](../installer/)). It carries the built MCP package and its Windows runtime dependencies. The installed copy also serves as the Node runtime for the helper and the MCP server.
@@ -34,9 +34,9 @@ With Node.js 20.19+: `node mcp/dist/index.js chat --install` (or `--uninstall`).
 
 ## Claude Code in a terminal or VS Code
 
-Installing the helper (`ClaudeChatSetup.exe` or `chat --install`) also runs `claude mcp add --scope user easyeda-copilot -- <installed runtime> <installed MCP server>`. New Claude Code sessions in any folder then have the EasyEDA tools, with no Node.js and no `npx`. The MCP server joins the bridge that the helper keeps open, so it works on the same EasyEDA windows as the dialog.
+Installing the helper (`AIChatSetup.exe` or `chat --install`) also runs `claude mcp add --scope user easyeda-ai-assistant -- <installed runtime> <installed MCP server>`. New Claude Code sessions in any folder then have the EasyEDA tools, with no Node.js and no `npx`. The MCP server joins the bridge that the helper keeps open, so it works on the same EasyEDA windows as the dialog.
 
-- An existing `easyeda-copilot` entry in your user configuration is replaced. Updating the helper points the entry at the new version.
+- The entry is named `easyeda-ai-assistant`, so an `easyeda-copilot` entry for upstream EasyEDA Copilot is left alone. Updating the helper points the entry at the new version.
 - `chat --install --no-claude-code` leaves your Claude Code configuration unchanged.
 - Uninstalling removes the entry only if the installer added it.
 - If Claude Code was installed after the helper, run the installer again.
@@ -45,7 +45,7 @@ Installing the helper (`ClaudeChatSetup.exe` or `chat --install`) also runs `cla
 
 Each message carries the document that is open in the EasyEDA window of the dialog (project, schematic page or PCB) and the primitives that are selected there: type, designator, name, net and primitive ID, for up to 60 of them. So you can select parts and write "what does this do?" or "move these closer to U1".
 
-The chip above the message box (**📍 Sheet 1 · R1, C2 +3**) shows what will be sent. Click it to leave the context out; the choice is remembered. `Copilot → Ask Claude about selection` opens the dialog with the selection taken and the message box focused.
+The chip above the message box (**📍 Sheet 1 · R1, C2 +3**) shows what will be sent. Click it to leave the context out; the choice is remembered. `AI Assistant → Ask Claude about selection` opens the dialog with the selection taken and the message box focused.
 
 The context is read when you send the message. Claude still uses the EasyEDA tools to read the design itself.
 
@@ -117,11 +117,11 @@ Rejected connections are logged with the origin. If your EasyEDA client sends an
 
 ## Troubleshooting
 
-- **"Claude Chat is not installed on this computer"**: use the download button and run `ClaudeChatSetup.exe`, or check `~/.easyeda-copilot/chat/daemon.log`.
+- **"Claude Chat is not installed on this computer"**: use the download button and run `AIChatSetup.exe`, or check `~/.easyeda-copilot/chat/daemon.log`.
 - **No 📍 chip above the message box**: the open document is not a schematic page or a PCB, or the extension is older than the dialog; reopen EasyEDA after updating the extension.
-- **Claude Code in a terminal does not list the EasyEDA tools**: run `claude mcp get easyeda-copilot`. If the entry is missing, run the installer again; start a new Claude Code session afterwards.
+- **Claude Code in a terminal does not list the EasyEDA tools**: run `claude mcp get easyeda-ai-assistant`. If the entry is missing, run the installer again; start a new Claude Code session afterwards.
 - **"Allow External Interactions"**: enable it in the Extensions Manager and reopen the dialog.
-- **"This EasyEDA window is not connected"**: use `Copilot → MCP` to restart the extension's bridge connection.
+- **"This EasyEDA window is not connected"**: use `AI Assistant → MCP` to restart the extension's bridge connection.
 - **Usage limits**: the header shows your 5-hour / 7-day subscription usage as reported by Claude Code.
 
 ## Terms

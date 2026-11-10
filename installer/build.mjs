@@ -1,4 +1,4 @@
-// Builds build/dist/ClaudeChatSetup.exe: a Windows installer for the Claude Chat helper.
+// Builds build/dist/AIChatSetup.exe: a Windows installer for the Claude Chat helper.
 // Requires a built MCP package (npm run build --workspace=easyeda-copilot-mcp) and Node.js with --build-sea.
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -95,7 +95,7 @@ writeFileSync(versionPath, `${mcpPackage.version}-${stamp}`);
 console.log(`Payload: ${fileCount} files, ${(payload.length / 1e6).toFixed(1)} MB compressed`);
 
 mkdirSync(outDir, { recursive: true });
-const output = join(outDir, 'ClaudeChatSetup.exe');
+const output = join(outDir, 'AIChatSetup.exe');
 const seaConfig = join(staging, 'sea.json');
 writeFileSync(seaConfig, JSON.stringify({
     main: join(here, 'main.cjs'),

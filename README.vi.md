@@ -27,24 +27,26 @@ Easyeda-AI là bản fork của [EasyEDA Copilot](https://github.com/biosshot/ea
 Cần có EasyEDA Pro Desktop và một tài khoản Claude: gói Pro hoặc Max, hoặc tài khoản Anthropic Console. Không cần Node.js, không cần terminal.
 
 1. Tải hai file trong [bản phát hành mới nhất](https://github.com/tungpv90/Easyeda-AI/releases/latest):
-   - [`easyeda-copilot_v1.3.5.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.5.eext): extension cho EasyEDA
-   - [`ClaudeChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe): trình cài helper chạy trên máy
+   - [`easyeda-ai-assistant_v1.3.5.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-ai-assistant_v1.3.5.eext): extension cho EasyEDA
+   - [`AIChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/AIChatSetup.exe): trình cài helper chạy trên máy
 2. Trong EasyEDA Pro, vào `Settings → Extensions → Extensions Manager → Import Extensions`, chọn file `.eext`, rồi bật **External Interactions**.
 
    <p align="center">
      <a href="docs/media/params.png"><img src="docs/media/params.png" alt="Bật External Interactions cho extension" width="560"></a>
    </p>
 
-3. Bấm đúp `ClaudeChatSetup.exe` **một lần**. Trình cài đặt sẽ:
+3. Bấm đúp `AIChatSetup.exe` **một lần**. Trình cài đặt sẽ:
    - cài Claude Code bằng trình cài chính thức của Anthropic nếu máy chưa có;
    - chép helper vào `%LOCALAPPDATA%\EasyEDA Copilot\Claude Chat`;
    - bật helper ngay, và cho nó tự chạy mỗi khi đăng nhập Windows;
-   - thêm MCP server `easyeda-copilot` vào Claude Code của bạn, để Claude Code trong terminal hoặc VS Code cũng dùng được các tool EasyEDA.
-4. Trong EasyEDA Pro, mở `Copilot → Claude Chat`. Nếu Claude Code chưa đăng nhập, bấm **Sign in with Claude** rồi đăng nhập trên trình duyệt.
+   - thêm MCP server `easyeda-ai-assistant` vào Claude Code của bạn, để Claude Code trong terminal hoặc VS Code cũng dùng được các tool EasyEDA.
+4. Trong EasyEDA Pro, mở `AI Assistant → Claude Chat`. Nếu Claude Code chưa đăng nhập, bấm **Sign in with Claude** rồi đăng nhập trên trình duyệt.
 
 Hỏi bằng tiếng Việt cũng được, ví dụ: "Rà soát sơ đồ này và liệt kê các lỗi nối dây" hoặc "Kiểm tra DRC của PCB và giải thích các lỗi quan trọng".
 
-Lần đầu chạy, Windows có thể báo "Windows protected your PC" vì trình cài đặt chưa được ký số. Bấm **More info → Run anyway**. Muốn cập nhật thì chạy `ClaudeChatSetup.exe` bản mới hơn. Muốn gỡ helper thì chạy `ClaudeChatSetup.exe --uninstall`.
+Lần đầu chạy, Windows có thể báo "Windows protected your PC" vì trình cài đặt chưa được ký số. Bấm **More info → Run anyway**. Muốn cập nhật thì chạy `AIChatSetup.exe` bản mới hơn. Muốn gỡ helper thì chạy `AIChatSetup.exe --uninstall`.
+
+**Nâng cấp từ 1.3.4 ("EasyEda Copilot"):** từ 1.3.5, extension là một extension riêng tên EasyEDA AI Assistant. Gỡ extension cũ trong Extensions Manager, import file `.eext` mới rồi bật lại **External Interactions**. `AIChatSetup.exe` cập nhật luôn helper đã cài bằng `ClaudeChatSetup.exe`.
 
 ### Hộp thoại làm được gì
 
@@ -54,7 +56,7 @@ Lần đầu chạy, Windows có thể báo "Windows protected your PC" vì trì
 - Hiện mức dùng gói Claude trong 5 giờ và 7 ngày. Cho dừng câu trả lời hoặc bắt đầu cuộc trò chuyện mới.
 - Liệt kê các model mà tài khoản Claude của bạn dùng được (Opus, Sonnet, Fable, Haiku và các phiên bản cũ hơn), kèm ID, context window, giới hạn output và giá API của từng model. Cho chọn mức effort.
 - Lưu lịch sử các cuộc trò chuyện. Mở lại một cuộc trò chuyện cũ để nói tiếp: Claude vẫn nhớ những gì đã trao đổi.
-- Tự gửi kèm tài liệu đang mở và các linh kiện, net đang chọn trong EasyEDA (chip 📍 phía trên ô nhập, bấm để tắt). Chọn linh kiện rồi hỏi "cái này làm gì?" là đủ. `Copilot → Ask Claude about selection` mở hộp thoại với vùng chọn hiện tại.
+- Tự gửi kèm tài liệu đang mở và các linh kiện, net đang chọn trong EasyEDA (chip 📍 phía trên ô nhập, bấm để tắt). Chọn linh kiện rồi hỏi "cái này làm gì?" là đủ. `AI Assistant → Ask Claude about selection` mở hộp thoại với vùng chọn hiện tại.
 - Đính kèm ảnh, PDF (ví dụ datasheet) và file văn bản như netlist bằng nút 📎, bằng cách dán ảnh chụp màn hình, hoặc kéo thả file vào hộp thoại.
 - Không chạy được lệnh shell và không sửa được file trên máy bạn.
 
@@ -68,7 +70,7 @@ Chi tiết, cấu hình và cách xử lý sự cố: [docs/claude-chat.md](docs
 
 Bạn vẫn có thể điều khiển EasyEDA từ Claude Code, Codex hoặc MCP client khác trong terminal, như EasyEDA Copilot gốc.
 
-**Claude Code:** `ClaudeChatSetup.exe` đã thêm sẵn MCP server `easyeda-copilot` vào Claude Code của bạn. Mở phiên Claude Code mới trong terminal hoặc VS Code là có các tool EasyEDA, không cần cài gì thêm.
+**Claude Code:** `AIChatSetup.exe` đã thêm sẵn MCP server `easyeda-ai-assistant` vào Claude Code của bạn. Mở phiên Claude Code mới trong terminal hoặc VS Code là có các tool EasyEDA, không cần cài gì thêm.
 
 Nếu không dùng trình cài đặt, hoặc dùng client khác: cài `.eext` như trên, rồi thêm MCP server (cần Node.js >= 20.19):
 
@@ -80,7 +82,7 @@ codex mcp add easyeda-copilot -- npx -y easyeda-copilot-mcp
 
 `npx easyeda-copilot-mcp` cài gói đã phát hành của bản gốc. Gói này có đủ các tool EasyEDA; riêng helper Claude Chat chỉ có trong bản fork này. Cấu hình MCP chung, build cục bộ và skill độc lập: xem [tài liệu gói MCP](mcp/README.md) và [hướng dẫn cài skill](mcp/docs/install-guide.md).
 
-Mở EasyEDA Pro và tài liệu cần làm, rồi bảo agent kiểm tra project đang mở. Extension tự tìm MCP bridge trên máy; `Copilot → MCP` dùng để tạm dừng hoặc bật lại kết nối.
+Mở EasyEDA Pro và tài liệu cần làm, rồi bảo agent kiểm tra project đang mở. Extension tự tìm MCP bridge trên máy; `AI Assistant → MCP` dùng để tạm dừng hoặc bật lại kết nối.
 
 ## Video minh hoạ
 
@@ -222,8 +224,8 @@ Cần Node.js ^20.19.0 hoặc >= 22.12.0.
 git clone https://github.com/tungpv90/Easyeda-AI.git
 cd Easyeda-AI
 npm ci
-npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.5.eext
-npm run build:installer    # helper     -> build/dist/ClaudeChatSetup.exe (Windows)
+npm run build              # extension  -> build/dist/easyeda-ai-assistant_v1.3.5.eext
+npm run build:installer    # helper     -> build/dist/AIChatSetup.exe (Windows)
 npm run check --workspace=mcp
 ```
 

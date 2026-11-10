@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Entry of ClaudeChatSetup.exe (a Node.js single executable application).
+ * Entry of AIChatSetup.exe (a Node.js single executable application).
  *
  * - Double-click / no arguments: install the Claude Chat helper for EasyEDA Copilot.
  * - `<file.js> ...args`: behave like `node <file.js> ...args`. The installed copy of
@@ -151,7 +151,7 @@ function runInstaller() {
         // Registers the login autostart entry, starts the helper now and adds the MCP server to Claude Code.
         if (helper(versionDir, ['--install']).status !== 0) throw new Error('The helper could not be registered.');
         log('');
-        log('Done. In EasyEDA Pro open Copilot -> Claude Chat and sign in with your Claude account.');
+        log('Done. In EasyEDA Pro open AI Assistant -> Claude Chat and sign in with your Claude account.');
         log('Claude Code in a terminal or VS Code can use the same EasyEDA tools.');
     }
 

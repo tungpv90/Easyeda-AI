@@ -27,23 +27,25 @@ Easyeda-AI is a fork of [EasyEDA Copilot](https://github.com/biosshot/easyeda-co
 You need EasyEDA Pro Desktop and a Claude account (Pro or Max subscription, or an Anthropic Console account). You do not need Node.js or a terminal.
 
 1. Download both files from the [latest release](https://github.com/tungpv90/Easyeda-AI/releases/latest):
-   - [`easyeda-copilot_v1.3.5.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.5.eext): the EasyEDA extension
-   - [`ClaudeChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe): the local helper installer
+   - [`easyeda-ai-assistant_v1.3.5.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-ai-assistant_v1.3.5.eext): the EasyEDA extension
+   - [`AIChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/AIChatSetup.exe): the local helper installer
 2. In EasyEDA Pro, open `Settings → Extensions → Extensions Manager → Import Extensions`, choose the `.eext` file, and enable **External Interactions**.
 
    <p align="center">
      <a href="docs/media/params.png"><img src="docs/media/params.png" alt="Enable External Interactions for the extension" width="560"></a>
    </p>
 
-3. Double-click `ClaudeChatSetup.exe` once. It:
+3. Double-click `AIChatSetup.exe` once. It:
    - installs Claude Code with Anthropic's official installer if it is missing;
    - copies the helper to `%LOCALAPPDATA%\EasyEDA Copilot\Claude Chat`;
    - starts the helper now and at every Windows login.
-4. In EasyEDA Pro, open `Copilot → Claude Chat`. If Claude Code is not signed in yet, select **Sign in with Claude** and finish the sign-in in your browser.
+4. In EasyEDA Pro, open `AI Assistant → Claude Chat`. If Claude Code is not signed in yet, select **Sign in with Claude** and finish the sign-in in your browser.
 
 Ask in any language, for example "Review this schematic and list wiring mistakes" or "Check the PCB for DRC errors and explain the important ones".
 
-Windows may show "Windows protected your PC" the first time, because the installer is not code-signed. Select **More info → Run anyway**. To update, run the newer `ClaudeChatSetup.exe`. To remove the helper, run `ClaudeChatSetup.exe --uninstall`.
+Windows may show "Windows protected your PC" the first time, because the installer is not code-signed. Select **More info → Run anyway**. To update, run the newer `AIChatSetup.exe`. To remove the helper, run `AIChatSetup.exe --uninstall`.
+
+**Upgrading from 1.3.4 ("EasyEda Copilot"):** from 1.3.5 the extension is a separate one named EasyEDA AI Assistant. Remove the old extension in the Extensions Manager, import the new `.eext` and enable **External Interactions** again. `AIChatSetup.exe` updates the helper installed by `ClaudeChatSetup.exe`.
 
 ### What the dialog does
 
@@ -66,7 +68,7 @@ Details, settings and troubleshooting: [docs/claude-chat.md](docs/claude-chat.md
 
 You can also drive EasyEDA from Claude Code, Codex or another MCP client in a terminal, as in upstream EasyEDA Copilot.
 
-**Claude Code:** `ClaudeChatSetup.exe` already added the `easyeda-copilot` MCP server to your Claude Code, so new sessions in a terminal or VS Code have the EasyEDA tools. Nothing else to install.
+**Claude Code:** `AIChatSetup.exe` already added the `easyeda-ai-assistant` MCP server to your Claude Code, so new sessions in a terminal or VS Code have the EasyEDA tools. Nothing else to install.
 
 Without the installer, or for another client, install the `.eext` as above, then add the MCP server (requires Node.js >= 20.19):
 
@@ -78,7 +80,7 @@ codex mcp add easyeda-copilot -- npx -y easyeda-copilot-mcp
 
 `npx easyeda-copilot-mcp` installs the published upstream package. It provides the same EasyEDA tools; only the Claude Chat helper is specific to this fork. For generic MCP configuration, local builds and the standalone skill, see the [MCP package documentation](mcp/README.md) and the [skill installation guide](mcp/docs/install-guide.md).
 
-Open EasyEDA Pro and the target document, then ask the agent to inspect the open project. The extension finds the local MCP bridge by itself; `Copilot → MCP` pauses or resumes the connection.
+Open EasyEDA Pro and the target document, then ask the agent to inspect the open project. The extension finds the local MCP bridge by itself; `AI Assistant → MCP` pauses or resumes the connection.
 
 ## Demonstrations
 
@@ -220,8 +222,8 @@ Requires Node.js ^20.19.0 or >= 22.12.0.
 git clone https://github.com/tungpv90/Easyeda-AI.git
 cd Easyeda-AI
 npm ci
-npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.5.eext
-npm run build:installer    # helper     -> build/dist/ClaudeChatSetup.exe (Windows)
+npm run build              # extension  -> build/dist/easyeda-ai-assistant_v1.3.5.eext
+npm run build:installer    # helper     -> build/dist/AIChatSetup.exe (Windows)
 npm run check --workspace=mcp
 ```
 

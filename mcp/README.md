@@ -26,7 +26,7 @@ MCP is the recommended and actively developed EasyEDA Copilot interface. The bui
 2. Start the MCP client with this server enabled.
 3. Open EasyEDA Desktop.
 4. Open the target schematic or PCB document.
-5. EasyEDA Copilot connects automatically. Use `Copilot -> MCP` only to pause or resume scanning.
+5. EasyEDA Copilot connects automatically. Use `AI Assistant -> MCP` only to pause or resume scanning.
 
 ## PCB Workflow
 

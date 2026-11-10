@@ -23,7 +23,7 @@ MCP 是 EasyEDA Copilot 推荐且持续积极开发的接口。内置 Interface 
 2. 启动启用了此服务器的 MCP 客户端。
 3. 打开 EasyEDA Desktop。
 4. 打开目标原理图或 PCB 文档。
-5. EasyEDA Copilot 将自动连接。仅在需要暂停或恢复扫描时使用 `Copilot -> MCP`。
+5. EasyEDA Copilot 将自动连接。仅在需要暂停或恢复扫描时使用 `AI Assistant -> MCP`。
 
 ## PCB 工作流
 PCB 功能仅可通过 MCP 客户端使用，无法通过内置的 Copilot 聊天窗口使用。

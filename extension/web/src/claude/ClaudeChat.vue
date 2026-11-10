@@ -36,10 +36,10 @@
       <template v-else-if="helperMissing">
         <h3>Claude Chat is not installed on this computer</h3>
         <template v-if="isWindows">
-          <p>Download <b>ClaudeChatSetup.exe</b> and run it once. It installs the helper for this window and adds the
+          <p>Download <b>AIChatSetup.exe</b> and run it once. It installs the helper for this window and adds the
             EasyEDA tools to Claude Code. This window connects by itself.</p>
           <div class="row">
-            <button @click="openExternal(CLAUDE_CHAT_SETUP_URL)">Download ClaudeChatSetup.exe</button>
+            <button @click="openExternal(CLAUDE_CHAT_SETUP_URL)">Download AIChatSetup.exe</button>
             <button class="ghost" @click="reconnect">Retry now</button>
           </div>
         </template>
@@ -60,9 +60,9 @@
     <section v-else-if="daemonError" class="panel">
       <h3>Claude Code not found</h3>
       <template v-if="isWindows">
-        <p>Run <b>ClaudeChatSetup.exe</b> again; it installs Claude Code.</p>
+        <p>Run <b>AIChatSetup.exe</b> again; it installs Claude Code.</p>
         <div class="row">
-          <button @click="openExternal(CLAUDE_CHAT_SETUP_URL)">Download ClaudeChatSetup.exe</button>
+          <button @click="openExternal(CLAUDE_CHAT_SETUP_URL)">Download AIChatSetup.exe</button>
           <button class="ghost" @click="reconnect">Check again</button>
         </div>
       </template>
@@ -118,7 +118,7 @@
       </div>
       <div v-if="noEasyEda" class="notice">
         This EasyEDA window is not connected to the helper yet. It usually connects within a few seconds;
-        if not, use <b>Copilot → MCP</b> to restart the connection.
+        if not, use <b>AI Assistant → MCP</b> to restart the connection.
       </div>
       <main ref="scroller" class="messages" @click="onMessagesClick">
         <div v-if="!items.length" class="empty">

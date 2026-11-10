@@ -1,7 +1,7 @@
 {
-	"name": "easyeda-copilot",
-	"uuid": "64651de62a944308a56e3b42eb2cb248",
-	"displayName": "EasyEda Copilot",
+	"name": "easyeda-ai-assistant",
+	"uuid": "4e8c65aa8781d51f978c31663d6f21b5",
+	"displayName": "EasyEDA AI Assistant",
 	"description": "AI-powered electronics design in EasyEDA Pro: schematic creation and editing, component search, PCB placement and routing, SPICE simulation, and design rule checks.",
 	"version": "1.3.5",
 	"publisher": "biosshot",
@@ -32,8 +32,8 @@
 	"headerMenus": {
 		"sch": [
 			{
-				"id": "Copilot",
-				"title": "Copilot",
+				"id": "AIAssistant",
+				"title": "AI Assistant",
 				"menuItems": [
 					{
 						"id": "ClaudeChat",
@@ -97,8 +97,8 @@
 		],
 		"pcb": [
 			{
-				"id": "Copilot",
-				"title": "Copilot",
+				"id": "AIAssistant",
+				"title": "AI Assistant",
 				"menuItems": [
 					{
 						"id": "ClaudeChat",

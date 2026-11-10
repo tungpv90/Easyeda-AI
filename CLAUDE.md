@@ -11,7 +11,7 @@ npm workspaces (one root `package-lock.json`; run `npm ci` from the root):
 - `extension/` (`@copilot/extension`): the EasyEDA extension. `src/` runs in the EasyEDA editor runtime; `web/` is the Vue 3 + Pinia UI served as iframes.
 - `mcp/` (`easyeda-copilot-mcp`): the MCP server, CLI, SDK, Claude Chat helper and agent-facing docs.
 - `shared/` (`@copilot/shared`): types, zod schemas, timeout policy and protocol contracts used by both. Imported directly as TypeScript (`@copilot/shared/types/...`) and bundled into each consumer.
-- `scripts/`: dependency switching and release tooling. `installer/`: Windows `ClaudeChatSetup.exe` builder.
+- `scripts/`: dependency switching and release tooling. `installer/`: Windows `AIChatSetup.exe` builder.
 
 Requires Node `^20.19.0 || >=22.12.0`.
 
@@ -21,7 +21,7 @@ All from the repo root.
 
 ```sh
 npm run dev                      # Vite dev server for extension/web
-npm run build                    # build + package extension -> build/dist/easyeda-copilot_v<VERSION>.eext (does not build MCP)
+npm run build                    # build + package extension -> build/dist/easyeda-ai-assistant_v<VERSION>.eext (does not build MCP)
 npm run eslint                   # lint extension/src and extension/web
 npm run test:extension           # all extension/tests/*.test.ts (node:test via tsx)
 
@@ -30,7 +30,7 @@ npm run check --workspace=mcp    # full MCP gate: build, typecheck, docs link ch
 npm run typecheck --workspace=mcp
 npm run inspect --workspace=mcp  # build and open MCP Inspector
 
-npm run build:installer          # Windows only: build MCP then build/dist/ClaudeChatSetup.exe
+npm run build:installer          # Windows only: build MCP then build/dist/AIChatSetup.exe
 npm run check:release            # version consistency, no local deps, platform binaries present
 ```
 

@@ -501,7 +501,7 @@ class OwnerBroker {
             throw new Error(`EasyEDA MCP interface is not connected.
 1. Open EasyEDA Pro.
 2. Open a project.
-3. Ensure Copilot -> MCP is enabled.`);
+3. Ensure AI Assistant -> MCP is enabled.`);
         }
 
         if (clients.length === 1) return clients[0];

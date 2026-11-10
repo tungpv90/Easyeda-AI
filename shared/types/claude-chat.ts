@@ -6,7 +6,7 @@
 export const CLAUDE_CHAT_DEFAULT_PORT = 8788;
 export const CLAUDE_CHAT_PROTOCOL_VERSION = 1;
 /** Windows installer of the helper, from the latest release. */
-export const CLAUDE_CHAT_SETUP_URL = 'https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe';
+export const CLAUDE_CHAT_SETUP_URL = 'https://github.com/tungpv90/Easyeda-AI/releases/latest/download/AIChatSetup.exe';
 export const CLAUDE_CHAT_GUIDE_URL = 'https://github.com/tungpv90/Easyeda-AI/blob/main/docs/claude-chat.md';
 
 export type ClaudeChatAccount = {

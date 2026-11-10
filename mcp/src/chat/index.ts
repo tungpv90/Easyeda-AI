@@ -5,9 +5,8 @@ import { join, resolve } from 'node:path';
 import { CLAUDE_CHAT_DEFAULT_PORT } from '@copilot/shared/types/claude-chat';
 import { startBridge, type Bridge } from '../bridge/index';
 import { installAutostart, startDetached, uninstallAutostart } from './autostart';
-import { mcpServerCommand, registerClaudeCodeMcp, unregisterClaudeCodeMcp } from './claude-code-mcp';
+import { CLAUDE_CODE_MCP_NAME, mcpServerCommand, registerClaudeCodeMcp, unregisterClaudeCodeMcp } from './claude-code-mcp';
 import { ChatServer } from './server';
-import { MCP_SERVER_NAME } from './session';
 
 const HOST = '127.0.0.1';
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
@@ -50,11 +49,11 @@ function makeLogger(logFile: string) {
 
 /** A failure here must not fail the install: the chat dialog does not need this entry. */
 async function addToClaudeCode(mcpEntry: string, stateDir: string) {
-    const manual = `claude mcp add --scope user ${MCP_SERVER_NAME} -- ${mcpServerCommand(mcpEntry).map(arg => (/\s/.test(arg) ? `"${arg}"` : arg)).join(' ')}`;
+    const manual = `claude mcp add --scope user ${CLAUDE_CODE_MCP_NAME} -- ${mcpServerCommand(mcpEntry).map(arg => (/\s/.test(arg) ? `"${arg}"` : arg)).join(' ')}`;
     try {
         const command = await registerClaudeCodeMcp(mcpEntry, stateDir);
         if (command) {
-            console.log(`Claude Code: added the "${MCP_SERVER_NAME}" MCP server for all your projects.`);
+            console.log(`Claude Code: added the "${CLAUDE_CODE_MCP_NAME}" MCP server for all your projects.`);
             console.log('The EasyEDA tools are available in new Claude Code sessions (terminal, VS Code).');
         } else {
             console.log(`Claude Code was not found. After installing it, run:\n  ${manual}`);
@@ -94,7 +93,7 @@ export async function runChat(argv: string[], mcpEntry: string) {
         if (process.platform !== 'darwin' && !(await isPortInUse(port))) startDetached(mcpEntry, errorLog);
         console.log('The Claude Chat helper is running and will start again after each login.');
         if (!argv.includes('--no-claude-code')) await addToClaudeCode(mcpEntry, stateDir);
-        console.log('Open EasyEDA Pro -> Copilot -> Claude Chat and sign in with your Claude account.');
+        console.log('Open EasyEDA Pro -> AI Assistant -> Claude Chat and sign in with your Claude account.');
         return;
     }
 

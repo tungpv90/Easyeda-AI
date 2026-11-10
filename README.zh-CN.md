@@ -158,7 +158,7 @@ npm install --omit=dev
 2. 在 EasyEDA Pro 中打开目标原理图或 PCB 文档。
 3. 让智能体检查当前打开的 EasyEDA 项目并开始设计工作流。
 
-扩展会自动发现本地 MCP 桥接服务。使用 `Copilot -> MCP` 可以暂停或恢复连接。
+扩展会自动发现本地 MCP 桥接服务。使用 `AI Assistant -> MCP` 可以暂停或恢复连接。
 
 ## 功能概览
 

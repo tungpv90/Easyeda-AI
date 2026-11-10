@@ -158,7 +158,7 @@ Después instala el directorio `skill/` generado como se explica en la [guía de
 2. Abre EasyEDA Pro y el esquema o la PCB de destino.
 3. Pide al agente que inspeccione el proyecto abierto en EasyEDA y empiece el flujo de diseño.
 
-La extensión encuentra el puente MCP local de forma automática. `Copilot -> MCP` pausa o reanuda la conexión.
+La extensión encuentra el puente MCP local de forma automática. `AI Assistant -> MCP` pausa o reanuda la conexión.
 
 ## Capacidades
 
