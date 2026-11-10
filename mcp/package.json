@@ -1,6 +1,6 @@
 {
   "name": "easyeda-copilot-mcp",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "mcpName": "io.github.biosshot/easyeda-copilot",
   "description": "MCP server, CLI, and SDK for EasyEDA Pro design automation, with schematic and PCB tools and SPICE simulation helpers.",
   "type": "module",
@@ -26,7 +26,7 @@
     "test:datasheets": "node --test tests/datasheets.test.mjs",
     "test:tool-results": "node --test tests/tool-result.test.mjs",
     "test:tool-handler": "node --import tsx --test tests/tool-handler.test.ts",
-    "test:chat": "node --import tsx --test tests/chat-origin.test.ts tests/chat-history.test.ts tests/chat-attachments.test.ts",
+    "test:chat": "node --import tsx --test tests/chat-origin.test.ts tests/chat-history.test.ts tests/chat-attachments.test.ts tests/chat-editor-context.test.ts",
     "test:api-docs": "node --test tests/api-docs.test.mjs",
     "docs:update-api": "node scripts/update-easyeda-api.mjs",
     "prebuild": "node ../scripts/build-local-dependencies.mjs",

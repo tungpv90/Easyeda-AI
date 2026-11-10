@@ -86,6 +86,7 @@ export function getLines(onLine: (line: Uint8Array, fieldLength: number) => void
                     // @ts-ignore:7029 \r case below should fallthrough to \n:
                     case ControlChars.CarriageReturn:
                         discardTrailingNewline = true;
+                    // falls through
                     case ControlChars.NewLine:
                         lineEnd = position;
                         break;
@@ -157,12 +158,13 @@ export function getMessages(
                 case 'id':
                     onId(message.id = value);
                     break;
-                case 'retry':
+                case 'retry': {
                     const retry = parseInt(value, 10);
                     if (!isNaN(retry)) { // per spec, ignore non-integers
                         onRetry(message.retry = retry);
                     }
                     break;
+                }
             }
         }
     }

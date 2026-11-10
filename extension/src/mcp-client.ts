@@ -208,7 +208,7 @@ async function waitForBeautifyComponents(expectedDesignators: string[], timeoutM
     const deadline = Date.now() + timeoutMs;
     let missing = [...expectedDesignators];
 
-    do {
+    for (;;) {
         const components = await eda.sch_PrimitiveComponent.getAll(ESCH_PrimitiveComponentType.COMPONENT);
         const actualDesignators = new Set(components.map(component => (
             rmPartFromDesignator(component.getState_Designator())
@@ -217,7 +217,7 @@ async function waitForBeautifyComponents(expectedDesignators: string[], timeoutM
         if (!missing.length) return;
         if (Date.now() >= deadline) break;
         await delay(500);
-    } while (true);
+    }
 
     throw new Error(`Beautify assembly omitted components after waiting for EasyEDA: ${missing.join(', ')}`);
 }

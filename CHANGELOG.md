@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.5 - 2026-11-11
+
+### Claude Chat
+
+- Installing the helper (`ClaudeChatSetup.exe` or `chat --install`) adds the `easyeda-copilot` MCP server to the user's Claude Code for all projects, run by the installed runtime, so Claude Code in a terminal or VS Code has the EasyEDA tools without Node.js or `npx`. An existing entry with that name is replaced; `--no-claude-code` skips this, and uninstalling removes only an entry the installer added.
+- Each message carries the open document (project, schematic page or PCB) and up to 60 selected primitives with type, designator, name, net and ID, read from the EasyEDA window of the dialog. A **📍** chip above the message box shows what is sent and turns it off; sent messages keep the label, also in the history. `Copilot → Ask Claude about selection` opens the dialog with the selection taken.
+- When the helper is not running, the dialog offers a **Download ClaudeChatSetup.exe** button (a link to the setup guide on macOS and Linux) and connects by itself afterwards. It also says which side to update when the helper and the extension are different versions.
+- Add Claude Fable 5.2 to the model table (1M context, 128K output, $8 / $40 per million tokens) and to the built-in list. A model that Claude Code lists by full ID among its current models is no longer placed under **Show older versions**.
+
+### Maintenance
+
+- `npm run eslint` passes again: typed the remaining `any` uses in the checkpoint scopes and the legacy SSE client, and replaced a constant loop condition and an unmarked `switch` fallthrough. No behavior change.
+
 ## 1.3.4 - 2026-11-02
 
 ### Claude Chat

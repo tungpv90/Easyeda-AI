@@ -7,6 +7,7 @@ import { BoardAssemble } from './pcb/board-assemble';
 import { ExplainPCB, SimplifiedDrcCategory } from './pcb/explain';
 import { SimulateResult } from './spice';
 import { RawPcb } from './pcb/raw';
+import type { ClaudeChatEditorContext } from './claude-chat';
 
 declare global {
     interface EDA {
@@ -18,6 +19,7 @@ declare global {
         checkPcbDrc?: (limit: number) => Promise<SimplifiedDrcCategory[]>,
         getAsmCircuit?: (primitiveIds?: string[]) => Promise<CircuitAssembly>,
         getLibraryUuidList?: (libraryUuid?: string) => Promise<string[]>,
+        getClaudeChatContext?: () => Promise<ClaudeChatEditorContext>,
         checkpointer?: {
             restore: (id?: string, allAgree?: boolean) => Promise<boolean>;
             save: (minor: boolean, name?: string) => Promise<string | null>;

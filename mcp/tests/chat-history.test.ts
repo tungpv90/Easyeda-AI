@@ -91,18 +91,22 @@ test('Claude Code model list is converted and enriched with specs', () => {
             value: 'default', resolvedModel: 'claude-opus-5-5', displayName: 'Default (recommended)',
             description: 'Opus 5.5', supportsEffort: true, supportedEffortLevels: ['low', 'high'],
         },
+        { value: 'claude-fable-5-2', resolvedModel: 'claude-fable-5-2', displayName: 'Fable 5.2' },
+        { value: 'haiku', resolvedModel: 'claude-haiku-5-5', displayName: 'Haiku 5.5' },
         { value: 'claude-haiku-4-5-20251001', resolvedModel: 'claude-haiku-4-5-20251001', displayName: 'Haiku 4.5' },
         { displayName: 'no value' },
     ]);
-    assert.equal(models.length, 2);
+    assert.equal(models.length, 4);
     assert.equal(models[0].value, '', 'default maps to no --model flag');
     assert.deepEqual(models[0].effortLevels, ['low', 'high']);
     assert.equal(models[0].contextWindow, 1_000_000);
     assert.equal(models[0].inputPricePerMTok, 4);
     assert.equal(models[0].legacy, false);
-    assert.equal(models[1].legacy, true);
-    assert.equal(models[1].contextWindow, 200_000, 'date snapshot suffix is ignored');
-    assert.equal(models[1].effortLevels, undefined);
+    assert.equal(models[1].legacy, false, 'a full ID listed before the last alias is a current model');
+    assert.equal(models[1].inputPricePerMTok, 8);
+    assert.equal(models[3].legacy, true);
+    assert.equal(models[3].contextWindow, 200_000, 'date snapshot suffix is ignored');
+    assert.equal(models[3].effortLevels, undefined);
     assert.deepEqual(claudeModelsFromClaudeCode('nope'), []);
     assert.equal(enrichClaudeModel({ value: 'x', displayName: 'Unknown' }).contextWindow, undefined);
 });

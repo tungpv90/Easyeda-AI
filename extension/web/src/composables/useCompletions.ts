@@ -53,7 +53,7 @@ export function useCompletions() {
             });
 
             if (result?.actions && Array.isArray(result.actions)) {
-                suggestions.value = result.actions.map((action: any) => ({
+                suggestions.value = result.actions.map((action: { title?: string; name?: string; description?: string; action?: string }) => ({
                     title: action.title || action.name || 'Action',
                     description: action.description || '',
                     action: action.action || JSON.stringify(action),

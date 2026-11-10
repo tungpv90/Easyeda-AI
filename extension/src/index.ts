@@ -24,6 +24,7 @@ import { checkpointer } from './eda/checkpointer';
 import { startMcpScanOnStartup, toggleMcpScan } from './mcp-client';
 import { checkPcbDrc } from './eda/drc';
 import { getLibraryUuidList } from './eda/place-component';
+import { getClaudeChatContext, requestClaudeAsk } from './eda/editor-context';
 
 eda.assembleCircuit = assembleCircuit;
 eda.assembleBoard = assembleBoard;
@@ -35,6 +36,7 @@ eda.searchComponentInSCH = searchComponentInSCH;
 eda.checkpointer = checkpointer;
 eda.checkPcbDrc = checkPcbDrc;
 eda.getLibraryUuidList = getLibraryUuidList;
+eda.getClaudeChatContext = getClaudeChatContext;
 
 startMcpScanOnStartup();
 
@@ -58,6 +60,11 @@ export async function openClaudeChat() {
 		maximizeButton: true,
 		minimizeButton: true,
 	});
+}
+
+export async function askClaudeAboutSelection() {
+	requestClaudeAsk();
+	await openClaudeChat();
 }
 
 export async function openMcp() {

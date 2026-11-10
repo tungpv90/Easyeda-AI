@@ -3,7 +3,7 @@
 	"uuid": "64651de62a944308a56e3b42eb2cb248",
 	"displayName": "EasyEda Copilot",
 	"description": "AI-powered electronics design in EasyEDA Pro: schematic creation and editing, component search, PCB placement and routing, SPICE simulation, and design rule checks.",
-	"version": "1.3.4",
+	"version": "1.3.5",
 	"publisher": "biosshot",
 	"engines": {
 		"eda": "^3.2.149"
@@ -39,6 +39,11 @@
 						"id": "ClaudeChat",
 						"title": "Claude Chat",
 						"registerFn": "openClaudeChat"
+					},
+					{
+						"id": "AskClaudeSelection",
+						"title": "Ask Claude about selection",
+						"registerFn": "askClaudeAboutSelection"
 					},
 					{
 						"id": "Interface",
@@ -99,6 +104,11 @@
 						"id": "ClaudeChat",
 						"title": "Claude Chat",
 						"registerFn": "openClaudeChat"
+					},
+					{
+						"id": "AskClaudeSelection",
+						"title": "Ask Claude about selection",
+						"registerFn": "askClaudeAboutSelection"
 					},
 					{
 						"id": "MCP",

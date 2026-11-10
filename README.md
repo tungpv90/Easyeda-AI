@@ -27,7 +27,7 @@ Easyeda-AI is a fork of [EasyEDA Copilot](https://github.com/biosshot/easyeda-co
 You need EasyEDA Pro Desktop and a Claude account (Pro or Max subscription, or an Anthropic Console account). You do not need Node.js or a terminal.
 
 1. Download both files from the [latest release](https://github.com/tungpv90/Easyeda-AI/releases/latest):
-   - [`easyeda-copilot_v1.3.4.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.4.eext): the EasyEDA extension
+   - [`easyeda-copilot_v1.3.5.eext`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/easyeda-copilot_v1.3.5.eext): the EasyEDA extension
    - [`ClaudeChatSetup.exe`](https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe): the local helper installer
 2. In EasyEDA Pro, open `Settings → Extensions → Extensions Manager → Import Extensions`, choose the `.eext` file, and enable **External Interactions**.
 
@@ -64,7 +64,11 @@ Details, settings and troubleshooting: [docs/claude-chat.md](docs/claude-chat.md
 
 ## Alternative: use your own MCP client
 
-You can also drive EasyEDA from Claude Code, Codex or another MCP client in a terminal, as in upstream EasyEDA Copilot. Install the `.eext` as above, then add the MCP server (requires Node.js >= 20.19):
+You can also drive EasyEDA from Claude Code, Codex or another MCP client in a terminal, as in upstream EasyEDA Copilot.
+
+**Claude Code:** `ClaudeChatSetup.exe` already added the `easyeda-copilot` MCP server to your Claude Code, so new sessions in a terminal or VS Code have the EasyEDA tools. Nothing else to install.
+
+Without the installer, or for another client, install the `.eext` as above, then add the MCP server (requires Node.js >= 20.19):
 
 ```bash
 claude mcp add easyeda-copilot -- npx -y easyeda-copilot-mcp
@@ -216,7 +220,7 @@ Requires Node.js ^20.19.0 or >= 22.12.0.
 git clone https://github.com/tungpv90/Easyeda-AI.git
 cd Easyeda-AI
 npm ci
-npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.4.eext
+npm run build              # extension  -> build/dist/easyeda-copilot_v1.3.5.eext
 npm run build:installer    # helper     -> build/dist/ClaudeChatSetup.exe (Windows)
 npm run check --workspace=mcp
 ```

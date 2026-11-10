@@ -112,6 +112,27 @@ export async function claudeLogout(claude: ClaudeExecutable) {
     await collect(spawnClaude(claude, ['auth', 'logout'], { stdio: ['ignore', 'pipe', 'pipe'] }), 20_000);
 }
 
+const MCP_CONFIG_TIMEOUT_MS = 30_000;
+
+export async function claudeMcpRemove(claude: ClaudeExecutable, name: string) {
+    const { code } = await collect(
+        spawnClaude(claude, ['mcp', 'remove', '--scope', 'user', name], { stdio: ['ignore', 'pipe', 'pipe'] }),
+        MCP_CONFIG_TIMEOUT_MS,
+    );
+    return code === 0;
+}
+
+/** Adds a stdio MCP server to the user's Claude Code (all projects), replacing one with the same name. */
+export async function claudeMcpAdd(claude: ClaudeExecutable, name: string, command: string[]) {
+    // `claude mcp add` refuses a name that already exists.
+    await claudeMcpRemove(claude, name);
+    const { code, stdout, stderr } = await collect(
+        spawnClaude(claude, ['mcp', 'add', '--scope', 'user', name, '--', ...command], { stdio: ['ignore', 'pipe', 'pipe'] }),
+        MCP_CONFIG_TIMEOUT_MS,
+    );
+    if (code !== 0) throw new Error((stderr || stdout).trim() || `claude mcp add ended with code ${code}.`);
+}
+
 const MODEL_LIST_TIMEOUT_MS = 30_000;
 
 /**

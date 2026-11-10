@@ -147,6 +147,8 @@ export async function fetchWithTask({
                 throw new Error(`Status check failed: ${statusRes.status} ${text}`);
             }
 
+            // The result shape depends on the endpoint; each caller reads its own fields.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const op: { status: string, result: any, error: string, intermediateResult: { action: string } } = await statusRes.json();
 
             const currentAction = op?.intermediateResult?.action;
@@ -212,7 +214,7 @@ export async function fetchSSE({
 
         onerror: (e) => {
             onerror?.(e);
-            throw new Error(e);
+            throw new Error(String(e));
         },
 
         onmessage: (msg) => {

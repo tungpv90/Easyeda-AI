@@ -35,8 +35,23 @@
       </template>
       <template v-else-if="helperMissing">
         <h3>Claude Chat is not installed on this computer</h3>
-        <p>Run <b>ClaudeChatSetup.exe</b> (it comes with this extension) once. This window connects by itself.</p>
-        <button @click="reconnect">Retry now</button>
+        <template v-if="isWindows">
+          <p>Download <b>ClaudeChatSetup.exe</b> and run it once. It installs the helper for this window and adds the
+            EasyEDA tools to Claude Code. This window connects by itself.</p>
+          <div class="row">
+            <button @click="openExternal(CLAUDE_CHAT_SETUP_URL)">Download ClaudeChatSetup.exe</button>
+            <button class="ghost" @click="reconnect">Retry now</button>
+          </div>
+        </template>
+        <template v-else>
+          <p>Install the helper once from a terminal. This window connects by itself.</p>
+          <div class="row">
+            <button @click="openExternal(CLAUDE_CHAT_GUIDE_URL)">Open the setup guide</button>
+            <button class="ghost" @click="reconnect">Retry now</button>
+          </div>
+        </template>
+        <p class="muted small">If the helper is already installed, it may have stopped: run the installer again or sign out of
+          your computer and back in.</p>
       </template>
       <p v-else class="muted">Connecting to Claude…</p>
     </section>
@@ -44,7 +59,20 @@
     <!-- 2. Claude Code missing or not signed in -->
     <section v-else-if="daemonError" class="panel">
       <h3>Claude Code not found</h3>
-      <p>Run <b>ClaudeChatSetup.exe</b> again; it installs Claude Code. Then reopen this window.</p>
+      <template v-if="isWindows">
+        <p>Run <b>ClaudeChatSetup.exe</b> again; it installs Claude Code.</p>
+        <div class="row">
+          <button @click="openExternal(CLAUDE_CHAT_SETUP_URL)">Download ClaudeChatSetup.exe</button>
+          <button class="ghost" @click="reconnect">Check again</button>
+        </div>
+      </template>
+      <template v-else>
+        <p>Install Claude Code, then check again.</p>
+        <div class="row">
+          <button @click="openExternal('https://claude.com/claude-code')">Get Claude Code</button>
+          <button class="ghost" @click="reconnect">Check again</button>
+        </div>
+      </template>
     </section>
 
     <section v-else-if="account && !account.loggedIn" class="panel">
@@ -83,6 +111,11 @@
 
     <!-- 4. Chat -->
     <template v-else>
+      <div v-if="versionNotice" class="notice">
+        {{ versionNotice.text }}
+        <a v-if="versionNotice.helperIsOlder" href="#" @click.prevent="openExternal(isWindows ? CLAUDE_CHAT_SETUP_URL : CLAUDE_CHAT_GUIDE_URL)">
+          {{ isWindows ? 'Download the update' : 'How to update' }}</a>
+      </div>
       <div v-if="noEasyEda" class="notice">
         This EasyEDA window is not connected to the helper yet. It usually connects within a few seconds;
         if not, use <b>Copilot → MCP</b> to restart the connection.
@@ -102,6 +135,7 @@
               </template>
             </div>
             <div v-if="item.text">{{ item.text }}</div>
+            <div v-if="item.context" class="sent-context" title="EasyEDA document and selection sent with this message">📍 {{ item.context }}</div>
           </div>
           <div v-else-if="item.kind === 'assistant' && item.text" class="msg assistant markdown" v-html="render(item.text)"></div>
           <details v-else-if="item.kind === 'tool'" class="tool" :class="item.state">
@@ -145,6 +179,15 @@
             <button class="chip-remove" title="Remove" @click="removePending(file)">✕</button>
           </div>
         </div>
+        <button
+          v-if="contextLabel"
+          class="context-chip"
+          :class="{ off: !includeContext, flash: contextFlash }"
+          :title="includeContext
+            ? 'Claude gets the open document and your selection with the next message. Click to leave them out.'
+            : 'The open document and your selection are not sent. Click to send them with the next message.'"
+          @click="includeContext = !includeContext"
+        >📍 {{ contextLabel }}</button>
         <div class="composer-row">
           <button
             class="ghost attach"
@@ -176,20 +219,24 @@ import type {
   ClaudeChatAccount,
   ClaudeChatAttachment,
   ClaudeChatConversationSummary,
+  ClaudeChatEditorContext,
   ClaudeChatModel,
   ClaudeChatServerMessage,
   ClaudeChatUsage,
 } from '@copilot/shared/types/claude-chat';
+import { CLAUDE_CHAT_GUIDE_URL, CLAUDE_CHAT_SETUP_URL } from '@copilot/shared/types/claude-chat';
 import { BUILTIN_CLAUDE_MODELS } from '@copilot/shared/claude-models';
+import { describeEditorContext } from '@copilot/shared/claude-editor-context';
+import extension from '../../../extension.json';
 import { ATTACHMENT_LIMITS, formatBytes } from '@copilot/shared/claude-attachments';
 import { AttachmentUploader, newUploadId, pickFiles, prepareFile, type PendingAttachment } from './attachments';
 import { markdown } from '../utils/markdown';
-import { ChatConnection, openExternal, type ConnectionStatus } from './connection';
+import { ChatConnection, hasEda, openExternal, type ConnectionStatus } from './connection';
 import HistoryPanel from './HistoryPanel.vue';
 import ModelPicker from './ModelPicker.vue';
 
 type Item =
-  | { kind: 'user'; key: string; text: string; attachments?: ClaudeChatAttachment[] }
+  | { kind: 'user'; key: string; text: string; attachments?: ClaudeChatAttachment[]; context?: string }
   | { kind: 'assistant'; key: string; text: string }
   | { kind: 'tool'; key: string; name: string; summary: string; state: 'running' | 'ok' | 'error'; preview?: string }
   | { kind: 'permission'; key: string; requestId: string; toolName: string; summary: string; description?: string; resolved?: 'allow' | 'deny' }
@@ -199,7 +246,15 @@ type Item =
 const LEGACY_STORAGE_KEY = 'easyeda-copilot-claude-chat';
 const PREFS_KEY = 'easyeda-copilot-claude-chat-prefs';
 
+/** How often the open document and selection are read from EasyEDA. */
+const CONTEXT_POLL_MS = 2_000;
+const CONTEXT_READ_TIMEOUT_MS = 1_500;
+/** "Ask Claude about selection" opens this dialog; a request this recent was meant for it. */
+const ASK_MAX_AGE_MS = 15_000;
+const isWindows = /win/i.test(navigator.platform || navigator.userAgent);
+
 const examples = [
+  'Explain what the selected parts do.',
   'Summarize the schematic on the current page.',
   'Check the PCB for DRC errors and explain the important ones.',
   'Find an LDO that gives 3.3 V at 500 mA from 5 V and add it with its capacitors.',
@@ -208,6 +263,7 @@ const examples = [
 const status = ref<ConnectionStatus>('connecting');
 const connectionError = ref<string>();
 const daemonError = ref<string>();
+const daemonVersion = ref<string>();
 const account = ref<ClaudeChatAccount>();
 const usage = ref<ClaudeChatUsage>();
 const instanceCount = ref<number>();
@@ -229,7 +285,35 @@ const dragging = ref(false);
 const scroller = ref<HTMLElement>();
 const inputEl = ref<HTMLTextAreaElement>();
 const login = reactive({ active: false, url: '', code: '', error: '' });
+const editorContext = ref<ClaudeChatEditorContext>();
+const includeContext = ref(prefs.includeContext);
+const contextFlash = ref(false);
+let contextTimer: ReturnType<typeof setInterval> | undefined;
+let lastAskToken: number | undefined;
 let keyCounter = 0;
+
+const contextLabel = computed(() => describeEditorContext(editorContext.value));
+const versionNotice = computed(() => {
+  const helper = daemonVersion.value;
+  if (!helper || helper === extension.version) return undefined;
+  const helperIsOlder = compareVersions(helper, extension.version) < 0;
+  return {
+    helperIsOlder,
+    text: helperIsOlder
+      ? `The helper on this computer (v${helper}) is older than this extension (v${extension.version}).`
+      : `This extension (v${extension.version}) is older than the helper on this computer (v${helper}). Import the newer extension in the Extensions Manager.`,
+  };
+});
+
+function compareVersions(a: string, b: string) {
+  const left = a.split('.').map(part => parseInt(part, 10) || 0);
+  const right = b.split('.').map(part => parseInt(part, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference) return difference;
+  }
+  return 0;
+}
 
 const ready = computed(() => status.value === 'connected' && account.value?.loggedIn === true);
 const noEasyEda = computed(() => instanceCount.value === 0);
@@ -256,22 +340,23 @@ function nextKey() {
   return `${Date.now().toString(36)}-${keyCounter}`;
 }
 
-function loadPrefs(): { model: string; effort: string } {
+function loadPrefs(): { model: string; effort: string; includeContext: boolean } {
   try {
     localStorage.removeItem(LEGACY_STORAGE_KEY);
     const parsed = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
     return {
       model: typeof parsed.model === 'string' ? parsed.model : '',
       effort: typeof parsed.effort === 'string' ? parsed.effort : '',
+      includeContext: parsed.includeContext !== false,
     };
   } catch {
-    return { model: '', effort: '' };
+    return { model: '', effort: '', includeContext: true };
   }
 }
 
-watch([model, effort], ([modelValue, effortValue]) => {
+watch([model, effort, includeContext], ([modelValue, effortValue, includeContextValue]) => {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ model: modelValue, effort: effortValue }));
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ model: modelValue, effort: effortValue, includeContext: includeContextValue }));
   } catch {
     // Storage can be unavailable; the chat still works.
   }
@@ -338,6 +423,7 @@ function apply(message: ClaudeChatServerMessage) {
   switch (message.type) {
     case 'hello':
       daemonError.value = message.error;
+      daemonVersion.value = message.daemonVersion;
       break;
     case 'auth.status':
       account.value = message.account;
@@ -374,7 +460,7 @@ function apply(message: ClaudeChatServerMessage) {
       busy.value = message.busy;
       break;
     case 'chat.user':
-      push({ kind: 'user', key: nextKey(), text: message.text, attachments: message.attachments });
+      push({ kind: 'user', key: nextKey(), text: message.text, attachments: message.attachments, context: message.context });
       break;
     case 'chat.text.start': {
       const item = push({ kind: 'assistant', key: nextKey(), text: '' }) as Item & { kind: 'assistant' };
@@ -542,18 +628,55 @@ function onMessagesClick(event: MouseEvent) {
   openExternal(anchor.href);
 }
 
-function submit() {
+/** Reads the open document and selection of this EasyEDA window; undefined outside EasyEDA. */
+async function readEditorContext() {
+  if (!hasEda() || typeof eda.getClaudeChatContext !== 'function') return undefined;
+  try {
+    return await Promise.race([
+      eda.getClaudeChatContext(),
+      new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), CONTEXT_READ_TIMEOUT_MS)),
+    ]);
+  } catch {
+    return undefined;
+  }
+}
+
+async function refreshEditorContext() {
+  const context = await readEditorContext();
+  if (!context) return editorContext.value;
+  editorContext.value = context;
+  const token = context.askToken;
+  if (token !== undefined && token !== lastAskToken) {
+    lastAskToken = token;
+    if (Date.now() - token < ASK_MAX_AGE_MS) takeSelection();
+  }
+  return context;
+}
+
+/** "Ask Claude about selection" was used in EasyEDA. */
+function takeSelection() {
+  includeContext.value = true;
+  showHistory.value = false;
+  contextFlash.value = true;
+  setTimeout(() => { contextFlash.value = false; }, 1_200);
+  nextTick(() => inputEl.value?.focus());
+}
+
+async function submit() {
   if (!canSend.value) return;
   const text = draft.value.trim();
   const attachments = readyFiles.value.map(file => file.id!);
   draft.value = '';
   pending.value = [];
+  // Read the selection again: it may have changed since the last poll.
+  const { askToken: _askToken, ...context } = (includeContext.value ? await refreshEditorContext() : undefined) ?? {};
   connection.send({
     type: 'chat.send',
     text,
     model: model.value || undefined,
     effort: effort.value || undefined,
     attachments: attachments.length ? attachments : undefined,
+    context: includeContext.value && Object.keys(context).length ? context : undefined,
   });
 }
 
@@ -617,8 +740,13 @@ function reconnect() {
 onMounted(() => {
   connection.connect();
   scrollToBottom();
+  refreshEditorContext();
+  contextTimer = setInterval(() => { if (!document.hidden) refreshEditorContext(); }, CONTEXT_POLL_MS);
 });
-onUnmounted(() => connection.dispose());
+onUnmounted(() => {
+  clearInterval(contextTimer);
+  connection.dispose();
+});
 </script>
 
 <style>
@@ -715,6 +843,14 @@ a { color: var(--accent); }
 .sent-files { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; white-space: normal; }
 .sent-thumb { max-width: 120px; max-height: 90px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); }
 .sent-file { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); }
+.sent-context { margin-top: 4px; font-size: 11px; color: var(--muted); white-space: normal; }
+.context-chip {
+  align-self: flex-start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 1px 8px; font-size: 12px; border-radius: 10px; background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  transition: border-color 0.3s, color 0.3s;
+}
+.context-chip.off { color: var(--muted); text-decoration: line-through; border-style: dashed; }
+.context-chip.flash { border-color: var(--accent); color: var(--accent); }
 .drop-overlay {
   position: fixed; inset: 8px; z-index: 30; display: flex; align-items: center; justify-content: center; text-align: center;
   border: 2px dashed var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--bg) 85%, transparent);

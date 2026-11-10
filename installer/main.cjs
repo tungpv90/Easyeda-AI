@@ -148,10 +148,11 @@ function runInstaller() {
 
         ensureClaudeCode();
 
-        // Registers the login autostart entry and starts the helper now.
+        // Registers the login autostart entry, starts the helper now and adds the MCP server to Claude Code.
         if (helper(versionDir, ['--install']).status !== 0) throw new Error('The helper could not be registered.');
         log('');
         log('Done. In EasyEDA Pro open Copilot -> Claude Chat and sign in with your Claude account.');
+        log('Claude Code in a terminal or VS Code can use the same EasyEDA tools.');
     }
 
     function uninstall() {

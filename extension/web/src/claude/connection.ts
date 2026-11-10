@@ -12,7 +12,7 @@ const PING_INTERVAL_MS = 4_000;
 const SILENCE_TIMEOUT_MS = 10_000;
 const RETRY_DELAY_MS = 3_000;
 
-const hasEda = () => typeof window !== 'undefined' && 'eda' in window;
+export const hasEda = () => typeof window !== 'undefined' && 'eda' in window;
 
 /**
  * Connection to the local chat daemon. Inside EasyEDA it goes through

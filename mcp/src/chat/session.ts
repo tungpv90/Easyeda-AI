@@ -98,9 +98,9 @@ export class ClaudeChatSession {
 
     /**
      * extra.content replaces the plain text block, e.g. with attached images and
-     * documents; extra.attachments is what the dialog shows with the message.
+     * documents; extra.attachments and extra.context are what the dialog shows with the message.
      */
-    send(text: string, model?: string, effort?: string, extra: { content?: unknown[]; attachments?: ClaudeChatAttachment[] } = {}) {
+    send(text: string, model?: string, effort?: string, extra: { content?: unknown[]; attachments?: ClaudeChatAttachment[]; context?: string } = {}) {
         if (this.busy) throw new Error('Claude is still working on the previous message.');
         const wantedModel = model?.trim() || undefined;
         const wantedEffort = effort?.trim() || undefined;
@@ -110,9 +110,12 @@ export class ClaudeChatSession {
         this.requestedEffort = wantedEffort;
         const child = this.ensureProcess();
         this.setBusy(true);
-        this.options.emit(extra.attachments?.length
-            ? { type: 'chat.user', text, attachments: extra.attachments }
-            : { type: 'chat.user', text });
+        this.options.emit({
+            type: 'chat.user',
+            text,
+            ...(extra.attachments?.length ? { attachments: extra.attachments } : {}),
+            ...(extra.context ? { context: extra.context } : {}),
+        });
         this.write(child, {
             type: 'user',
             message: { role: 'user', content: extra.content ?? [{ type: 'text', text }] },

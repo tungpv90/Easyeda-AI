@@ -11,10 +11,11 @@ const K = 1_000;
 const M = 1_000_000;
 
 /**
- * Published specs and Anthropic API list prices (USD per million tokens), as of 2026-10.
+ * Published specs and Anthropic API list prices (USD per million tokens), as of 2026-11.
  * Claude Code supplies the model list itself; this only adds the numbers it does not report.
  */
 export const CLAUDE_MODEL_SPECS: Record<string, ModelSpec> = {
+    'claude-fable-5-2': { contextWindow: M, maxOutputTokens: 128 * K, inputPricePerMTok: 8, outputPricePerMTok: 40 },
     'claude-fable-5-1': { contextWindow: M, maxOutputTokens: 128 * K, inputPricePerMTok: 10, outputPricePerMTok: 50 },
     'claude-fable-5': { contextWindow: M, maxOutputTokens: 128 * K, inputPricePerMTok: 10, outputPricePerMTok: 50 },
     'claude-opus-5-5': { contextWindow: M, maxOutputTokens: 128 * K, inputPricePerMTok: 4, outputPricePerMTok: 20 },
@@ -36,8 +37,9 @@ export const BUILTIN_CLAUDE_MODELS: ClaudeChatModel[] = [
     { value: '', displayName: 'Default (recommended)', description: 'Claude Code chooses the model for your plan' },
     { value: 'opus', displayName: 'Opus', resolvedModel: 'claude-opus-5-5', description: 'For complex work and everyday tasks' },
     { value: 'sonnet', displayName: 'Sonnet', resolvedModel: 'claude-sonnet-5-5', description: 'Most efficient for simpler tasks' },
-    { value: 'fable', displayName: 'Fable', resolvedModel: 'claude-fable-5-1', description: 'For your toughest challenges' },
+    { value: 'claude-fable-5-2', displayName: 'Fable 5.2', resolvedModel: 'claude-fable-5-2', description: 'For your toughest challenges' },
     { value: 'haiku', displayName: 'Haiku', resolvedModel: 'claude-haiku-5-5', description: 'Fastest for quick answers' },
+    { value: 'fable', displayName: 'Fable 5.1', resolvedModel: 'claude-fable-5-1', description: 'Most capable for your hardest and longest-running tasks' },
 ].map(model => enrichClaudeModel({ ...model, effortLevels: EFFORT_LEVELS }));
 
 /** Strips a date snapshot suffix: claude-haiku-4-5-20251001 -> claude-haiku-4-5. */
@@ -72,9 +74,10 @@ export function claudeModelsFromClaudeCode(raw: unknown): ClaudeChatModel[] {
             description: typeof item.description === 'string' ? item.description : undefined,
             resolvedModel: typeof item.resolvedModel === 'string' ? item.resolvedModel : undefined,
             effortLevels: item.supportsEffort === true && levels.length ? levels : undefined,
-            // Claude Code lists its aliases first, then pinned model IDs.
-            legacy: value.startsWith('claude-'),
         }));
     }
-    return models;
+    // Claude Code lists its current models first, then pinned older versions. A new model
+    // can be listed by its full ID before it gets an alias, so only IDs after the last alias are older.
+    const lastAlias = models.reduce((last, model, index) => (model.value.startsWith('claude-') ? last : index), -1);
+    return models.map((model, index) => ({ ...model, legacy: index > lastAlias && model.value.startsWith('claude-') }));
 }

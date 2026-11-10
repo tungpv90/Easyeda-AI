@@ -40,7 +40,7 @@ export interface FetchEventSourceInit extends RequestInit {
      * If this callback is not specified, or it returns undefined, fetchEventSource
      * will treat every error as retriable and will try again after 1 second.
      */
-    onerror?: (err: any) => number | null | undefined | void,
+    onerror?: (err: unknown) => number | null | undefined | void,
 
     /**
      * If true, will keep the request open even if the document is hidden.
@@ -132,7 +132,7 @@ export function fetchEventSource(input: RequestInfo, {
                     // if we haven't aborted the request ourselves:
                     try {
                         // check if we need to retry:
-                        const interval: any = onerror?.(err) ?? retryInterval;
+                        const interval = (onerror?.(err) ?? retryInterval) as number;
                         window.clearTimeout(retryTimer);
                         retryTimer = window.setTimeout(create, interval);
                     } catch (innerErr) {

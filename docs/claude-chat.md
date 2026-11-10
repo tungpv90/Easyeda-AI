@@ -10,10 +10,13 @@ The dialog uses **your own Claude Code installation and sign-in** (Claude Pro or
 2. Double-click `ClaudeChatSetup.exe` once. It needs no Node.js. It:
    - installs Claude Code with Anthropic's official installer if it is missing;
    - copies the helper to `%LOCALAPPDATA%\EasyEDA Copilot\Claude Chat`;
-   - starts the helper now and at every Windows login (Startup folder).
+   - starts the helper now and at every Windows login (Startup folder);
+   - adds the `easyeda-copilot` MCP server to your Claude Code (see [Claude Code in a terminal or VS Code](#claude-code-in-a-terminal-or-vs-code)).
 3. Open `Copilot → Claude Chat`. If Claude Code is not signed in yet, select **Sign in with Claude**; a browser window opens for the claude.ai sign-in.
 
-Running `ClaudeChatSetup.exe` again updates the helper. `ClaudeChatSetup.exe --uninstall` removes it.
+If you open the dialog before step 2, it shows a **Download ClaudeChatSetup.exe** button and connects by itself once the helper runs.
+
+Running `ClaudeChatSetup.exe` again updates the helper. `ClaudeChatSetup.exe --uninstall` removes it. When the helper and the extension are different versions, the dialog says which one to update.
 
 Why a separate installer: EasyEDA extensions run in a sandbox and cannot start programs, so the helper that runs Claude Code has to be installed outside EasyEDA.
 
@@ -28,6 +31,23 @@ The installer is a Node.js single executable application ([installer/](../instal
 ### Other platforms and development
 
 With Node.js 20.19+: `node mcp/dist/index.js chat --install` (or `--uninstall`). This uses a LaunchAgent on macOS and XDG autostart on Linux. To run in the foreground: `node mcp/dist/index.js chat`.
+
+## Claude Code in a terminal or VS Code
+
+Installing the helper (`ClaudeChatSetup.exe` or `chat --install`) also runs `claude mcp add --scope user easyeda-copilot -- <installed runtime> <installed MCP server>`. New Claude Code sessions in any folder then have the EasyEDA tools, with no Node.js and no `npx`. The MCP server joins the bridge that the helper keeps open, so it works on the same EasyEDA windows as the dialog.
+
+- An existing `easyeda-copilot` entry in your user configuration is replaced. Updating the helper points the entry at the new version.
+- `chat --install --no-claude-code` leaves your Claude Code configuration unchanged.
+- Uninstalling removes the entry only if the installer added it.
+- If Claude Code was installed after the helper, run the installer again.
+
+## What Claude knows about your EasyEDA window
+
+Each message carries the document that is open in the EasyEDA window of the dialog (project, schematic page or PCB) and the primitives that are selected there: type, designator, name, net and primitive ID, for up to 60 of them. So you can select parts and write "what does this do?" or "move these closer to U1".
+
+The chip above the message box (**📍 Sheet 1 · R1, C2 +3**) shows what will be sent. Click it to leave the context out; the choice is remembered. `Copilot → Ask Claude about selection` opens the dialog with the selection taken and the message box focused.
+
+The context is read when you send the message. Claude still uses the EasyEDA tools to read the design itself.
 
 ## How it works
 
@@ -46,7 +66,7 @@ EasyEDA dialog ──ws://127.0.0.1:8788──▶ chat helper ──stdin/stdout
 
 The model button in the header lists the models your account can use. The helper asks your Claude Code for the list (a stream-json `initialize` request, which does not call the API or use your limits) and keeps it for 30 minutes or until you sign in or out. **Refresh list** asks again.
 
-For each model the list shows its name, Claude Code's description, the full model ID, the context window, the output limit and the Anthropic API price per million input/output tokens. Pro and Max plans are not billed per token; the price shows how fast a model uses up your 5-hour and 7-day limits. **Show older versions** lists pinned models such as Opus 4.8 or Haiku 4.5. If Claude Code cannot be asked, the dialog shows the standard aliases (Default, Opus, Sonnet, Fable, Haiku).
+For each model the list shows its name, Claude Code's description, the full model ID, the context window, the output limit and the Anthropic API price per million input/output tokens. Pro and Max plans are not billed per token; the price shows how fast a model uses up your 5-hour and 7-day limits. **Show older versions** lists pinned models such as Opus 4.8 or Haiku 4.5. A model that Claude Code lists among its current ones by full ID (Fable 5.2, as of November 2026) stays in the main list. If Claude Code cannot be asked, the dialog shows a built-in list (Default, Opus, Sonnet, Fable 5.2, Haiku, Fable 5.1).
 
 **Effort** (low to max, for models that support it) is passed as `claude --effort`. Higher effort thinks longer and uses more of your limits. Changing the model or effort restarts Claude Code for the next message; the conversation continues.
 
@@ -97,7 +117,9 @@ Rejected connections are logged with the origin. If your EasyEDA client sends an
 
 ## Troubleshooting
 
-- **"Claude Chat is not installed on this computer"**: run `ClaudeChatSetup.exe` again, or check `~/.easyeda-copilot/chat/daemon.log`.
+- **"Claude Chat is not installed on this computer"**: use the download button and run `ClaudeChatSetup.exe`, or check `~/.easyeda-copilot/chat/daemon.log`.
+- **No 📍 chip above the message box**: the open document is not a schematic page or a PCB, or the extension is older than the dialog; reopen EasyEDA after updating the extension.
+- **Claude Code in a terminal does not list the EasyEDA tools**: run `claude mcp get easyeda-copilot`. If the entry is missing, run the installer again; start a new Claude Code session afterwards.
 - **"Allow External Interactions"**: enable it in the Extensions Manager and reopen the dialog.
 - **"This EasyEDA window is not connected"**: use `Copilot → MCP` to restart the extension's bridge connection.
 - **Usage limits**: the header shows your 5-hour / 7-day subscription usage as reported by Claude Code.

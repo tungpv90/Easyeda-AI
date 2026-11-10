@@ -7,6 +7,8 @@ type Store = {
     unpin(id: string): void;
 };
 type Scope = { token: string; sessionId: string; documentUuid: string; checkpointId: string; expiresAt: number };
+/** The part of the EasyEDA API used here; the whole object is handed to the executed code. */
+type EditorApi = { dmt_SelectControl: { getCurrentDocumentInfo(): Promise<{ uuid?: string } | undefined> } };
 
 /** Called only in the existing serial editor queue. Tokens are per logical SDK session. */
 export class CheckpointScopes {
@@ -25,7 +27,7 @@ export class CheckpointScopes {
         this.epoch = epoch;
     }
 
-    async execute(body: { code: string; inputs?: Record<string, string>; checkpointScope?: unknown }, api: any, epoch: number, signal?: AbortSignal): Promise<ExecuteJsWireResult> {
+    async execute(body: { code: string; inputs?: Record<string, string>; checkpointScope?: unknown }, api: EditorApi, epoch: number, signal?: AbortSignal): Promise<ExecuteJsWireResult> {
         this.sweep(epoch);
         const raw = body.checkpointScope;
         if (raw === undefined) return executeJavaScript(body.code, api, () => this.store.save(false, 'Before JavaScript execution'), body.inputs, { signal });

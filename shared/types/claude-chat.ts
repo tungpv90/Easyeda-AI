@@ -5,6 +5,9 @@
 
 export const CLAUDE_CHAT_DEFAULT_PORT = 8788;
 export const CLAUDE_CHAT_PROTOCOL_VERSION = 1;
+/** Windows installer of the helper, from the latest release. */
+export const CLAUDE_CHAT_SETUP_URL = 'https://github.com/tungpv90/Easyeda-AI/releases/latest/download/ClaudeChatSetup.exe';
+export const CLAUDE_CHAT_GUIDE_URL = 'https://github.com/tungpv90/Easyeda-AI/blob/main/docs/claude-chat.md';
 
 export type ClaudeChatAccount = {
     loggedIn: boolean;
@@ -57,6 +60,28 @@ export type ClaudeChatAttachment = {
     thumbnail?: string;
 };
 
+/** One selected primitive in the EasyEDA window of the dialog. */
+export type ClaudeChatSelectedItem = {
+    id: string;
+    /** Primitive type as EasyEDA names it, e.g. Component, Wire, Track, Via. */
+    type: string;
+    designator?: string;
+    name?: string;
+    net?: string;
+};
+
+/** What the user has open and selected in EasyEDA when a message is sent. */
+export type ClaudeChatEditorContext = {
+    projectName?: string;
+    documentType?: 'schematic' | 'pcb';
+    documentName?: string;
+    documentUuid?: string;
+    /** total counts every selected primitive; items may be cut short. */
+    selection?: { total: number; items: ClaudeChatSelectedItem[] };
+    /** Set by "Ask Claude about selection"; a new value asks the dialog to take the selection. */
+    askToken?: number;
+};
+
 export type ClaudeChatUsage = {
     fiveHour?: number;
     sevenDay?: number;
@@ -72,8 +97,8 @@ export type ClaudeChatClientMessage =
     | { type: 'auth.login.input'; text: string }
     | { type: 'auth.login.cancel' }
     | { type: 'auth.logout' }
-    /** attachments: ids from `attachment.ready`. */
-    | { type: 'chat.send'; text: string; model?: string; effort?: string; attachments?: string[] }
+    /** attachments: ids from `attachment.ready`. context: the EasyEDA document and selection of this dialog. */
+    | { type: 'chat.send'; text: string; model?: string; effort?: string; attachments?: string[]; context?: ClaudeChatEditorContext }
     /**
      * Upload in order: begin, then chunks of base64 data, each sent after the previous
      * one is acknowledged, then end. uploadId is chosen by the dialog.
@@ -107,7 +132,8 @@ export type ClaudeChatServerMessage =
     | { type: 'auth.login.output'; text: string; url?: string }
     | { type: 'auth.login.done'; ok: boolean; error?: string }
     | { type: 'chat.state'; busy: boolean; sessionId?: string; model?: string; mcpStatus?: string }
-    | { type: 'chat.user'; text: string; attachments?: ClaudeChatAttachment[] }
+    /** context: short label of the EasyEDA document and selection sent with the message. */
+    | { type: 'chat.user'; text: string; attachments?: ClaudeChatAttachment[]; context?: string }
     /** Replies to the uploading dialog only. received counts bytes stored so far. */
     | { type: 'attachment.ack'; uploadId: string; index: number; received: number }
     | { type: 'attachment.ready'; uploadId: string; attachment: ClaudeChatAttachment }
